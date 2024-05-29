@@ -1,0 +1,43 @@
+{
+  "name": "networkwm-js",
+  "version": "0.1.0",
+  "description": "A library which lets you manage tracks and metadata on Sony Network Walkmen.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asivery/networkwm-js.git"
+  },
+  "keywords": [
+    "sony",
+    "walkman",
+    "mp3",
+    "atrac"
+  ],
+  "author": "asivery",
+  "license": "GPL-2.0",
+  "files": [
+    "dist"
+  ],
+  "bugs": {
+    "url": "https://github.com/asivery/networkwm-js/issues"
+  },
+  "homepage": "https://github.com/asivery/networkwm-js#readme",
+  "devDependencies": {
+    "@types/node": "^18.11.9",
+    "prettier": "^2.8.8",
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "@originjs/crypto-js-wasm": "github:asivery/crypto-js-wasm",
+    "async-mutex": "^0.4.0",
+    "himd-js": "^0.2.0-alpha.3",
+    "mp3-parser": "^0.3.0",
+    "node-id3": "^0.2.5",
+    "node-mass-storage": "^0.2.0",
+    "nufatfs": "^0.1.2",
+    "usb": "^2.4.1"
+  }
+}
