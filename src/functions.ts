@@ -2,7 +2,7 @@ import { CodecInfo, UMSCHiMDFilesystem } from "himd-js";
 import { FatFilesystem } from "nufatfs";
 import { WebUSBDevice } from "usb";
 import { DatabaseManager } from "./databases";
-import { SonyVendorNWJSUSMCDriver, UMSCNWJSSession } from "./filesystem";
+import { SonyVendorNWJSUSMCDriver, UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA } from "./tagged-oma";
 import { concatUint8Arrays, join } from "./utils";
 
@@ -30,44 +30,7 @@ export async function uploadTrack(
 
 export async function createNWJSFS(webUsbDevice: WebUSBDevice, bypassCoherencyChecks: boolean){
     // Connect into the HiMD codebase
-    const fs = new UMSCHiMDFilesystem(webUsbDevice);
-    fs.driver = new SonyVendorNWJSUSMCDriver(webUsbDevice, 0x06);
-    // HACK: This should be incorporated into himd-js by making it more generic.
-    (fs as any).initFS = async function(){
-        await this.driver.inquiry();
-        await this.driver.testUnitReady();
-        const partInfo = await this.driver.getCapacity();
-        console.log(partInfo);
-        this.fsUncachedDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(0, true);
-
-        this.fsDriver = {...this.fsUncachedDriver,
-            readSectors: async (i: number, count: number) => {
-                let outputBuffers: Uint8Array[] = [];
-                while(count > 0){
-                    let toRead = Math.min(count, 100);
-                    outputBuffers.push(await this.fsUncachedDriver!.readSectors(i, toRead));
-                    i += toRead;
-                    count -= toRead;
-                }
-                return concatUint8Arrays(outputBuffers);
-            },
-            writeSectors: async (i: number, data: Uint8Array) => {
-                let offset = 0;
-                while(offset < data.length) {
-                    let toWrite = data.subarray(offset, Math.min(data.length, offset + partInfo.blockSize * 10));
-                    await this.fsUncachedDriver!.writeSectors(i, toWrite);
-                    offset += toWrite.length;
-                    i += toWrite.length / partInfo.blockSize;
-                }
-            }
-        };
-
-        this.fatfs = await FatFilesystem.create(this.fsDriver, bypassCoherencyChecks);
-        this.volumeSize = partInfo.deviceSize;
-        this.lowSectorsCache = () => Array(1000)
-            .fill(0)
-            .map(() => ({ dirty: false, data: null }));
-    }
+    const fs = new UMSCNWJSFilesystem(webUsbDevice);
 
     await fs.init();
     return fs;
