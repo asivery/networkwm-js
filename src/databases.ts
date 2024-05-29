@@ -345,4 +345,48 @@ export class DatabaseManager {
 
         return newGlobalIndex;
     }
+
+    public listContent(): { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string }[]}[] {
+        const groupedEncountered: number[] = [];
+        const groups: { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string }[]}[] = [];
+        // 01TREE01.DAT is groups
+        const tree = this.parsedTreeFiles["01TREE01.DAT"];
+        const desc = this.parsedGroupInfoFiles["03GINF01.DAT"];
+
+        const getGlobalTrack = (track: number) => {
+            const globalTrack = this.globalContentInfoFile[track - 1];
+            return {
+                album: globalTrack.contents['TALB'],
+                artist: globalTrack.contents['TPE1'],
+                genre: globalTrack.contents['TCON'],
+                title: globalTrack.contents['TIT2'],
+            };
+        }
+
+        for(let trackIndex = 0; trackIndex < tree.tplb.length; trackIndex++) {
+            const track = tree.tplb[trackIndex];
+            let gplbEntry = -1;
+            // If Sony can depend on GPLBs being ordered correctly, so can I.
+            for(let i = tree.mapStartBounds.length - 1; i >= 0; i--) {
+                const gplb = tree.mapStartBounds[i];
+                if((trackIndex+1) >= gplb.firstTrackApplicableInTPLB){
+                    gplbEntry = gplb.groupInfoIndex;
+                    break;
+                }
+            }
+            if(gplbEntry !== -1){
+                groupedEncountered.push(track);
+                if(groups.length < gplbEntry) {
+                    groups.push({ groupName: desc[gplbEntry - 1].contents['TIT2'], contents: []});
+                }
+                groups[gplbEntry - 1].contents.push(getGlobalTrack(track));
+            }
+        }
+
+        let ungrouped = Array(this.globalContentInfoFile.length).fill(0).map((_, i) => i + 1).filter(e => !groupedEncountered.includes(e));
+        const ungroupedGroup = { groupName: null, contents: ungrouped.map(getGlobalTrack)};
+        groups.splice(0, 0, ungroupedGroup);
+
+        return groups;
+    }
 }
