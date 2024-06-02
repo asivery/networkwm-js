@@ -1,10 +1,10 @@
-import { CodecInfo, UMSCHiMDFilesystem } from "himd-js";
-import { FatFilesystem } from "nufatfs";
-import { WebUSBDevice } from "usb";
+import { CodecInfo } from "himd-js";
+import { WebUSBDevice, findByIds } from "usb";
 import { DatabaseManager } from "./databases";
-import { SonyVendorNWJSUSMCDriver, UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
+import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA } from "./tagged-oma";
-import { concatUint8Arrays, join } from "./utils";
+import { join } from "./utils";
+import { DeviceIds } from "./devices";
 
 export async function uploadTrack(
     database: DatabaseManager,
@@ -34,4 +34,33 @@ export async function createNWJSFS(webUsbDevice: WebUSBDevice, bypassCoherencyCh
 
     await fs.init();
     return fs;
+}
+
+export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, name: string } | null> {
+    let legacyDevice: any, devName: string | null = null;
+    for(let dev of DeviceIds){
+        legacyDevice = findByIds(dev.vendorId, dev.productId)!;
+        if(legacyDevice) {
+            devName = dev.name;
+            break;
+        }
+    }
+    
+    if(!legacyDevice) {
+        return null;
+    }
+
+    legacyDevice.open();
+    await new Promise(res => legacyDevice.reset(res));
+    const iface = legacyDevice.interface(0);
+    try{
+        if(iface.isKernelDriverActive())
+            iface.detachKernelDriver();
+    }catch(ex){
+        // console.log("Couldn't detach the kernel driver. Expected on Windows.");
+    }
+    const webUsbDevice = (await WebUSBDevice.createInstance(legacyDevice))!;
+    await webUsbDevice.open();
+
+    return { dev: webUsbDevice, name: devName! };
 }

@@ -51,26 +51,14 @@ Example:
 async function example(){
     await initCrypto();
     importKeys(...);
-    let legacyDevice = findByIds(0x054c, 0x01ad)!;
-    
-    if(!legacyDevice) {
-        console.log("No such device!");
-        return false;
+    const _dev = await openNewDeviceNode();
+    if(!_dev) {
+        console.log("Could not connect!");
+        return;
     }
-
-    legacyDevice.open();
-    await new Promise(res => legacyDevice.reset(res));
-    const iface = legacyDevice.interface(0);
-    try{
-        if(iface.isKernelDriverActive())
-            iface.detachKernelDriver();
-    }catch(ex){
-        console.log("Couldn't detach the kernel driver. Expected on Windows.");
-    }
-    const webUsbDevice = (await WebUSBDevice.createInstance(legacyDevice))!;
-    await webUsbDevice.open();
-
-    const fs = await createNWJSFS(webUsbDevice, false);
+    const { dev, name } = _dev;
+    console.log(`Connected to ${name}`);
+    const fs = await createNWJSFS(dev, false);
     // Open a writing session
     const session = new UMSCNWJSSession(fs.driver as SonyVendorNWJSUSMCDriver, fs);
     await session.performAuthorization();
@@ -100,20 +88,14 @@ It is also possible to use this library to simply sign the device, so that it pl
 async function example(){
     await initCrypto();
     importKeys(...);
-    let legacyDevice = findByIds(0x054c, 0x01ad)!;
-
-    await new Promise(res => legacyDevice.reset(res));
-    const iface = legacyDevice.interface(0);
-    try{
-        if(iface.isKernelDriverActive())
-            iface.detachKernelDriver();
-    }catch(ex){
-        console.log("Couldn't detach the kernel driver. Expected on Windows.");
+    const _dev = await openNewDeviceNode();
+    if(!_dev) {
+        console.log("Could not connect!");
+        return;
     }
-    const webUsbDevice = (await WebUSBDevice.createInstance(legacyDevice))!;
-    await webUsbDevice.open();
-
-    const fs = await createNWJSFS(webUsbDevice, false);
+    const { dev, name } = _dev;
+    console.log(`Connected to ${name}`);
+    const fs = await createNWJSFS(dev, false);
 
     // Start a new session...
     const session = new UMSCNWJSSession(fs.driver as SonyVendorNWJSUSMCDriver, fs);

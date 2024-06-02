@@ -3,3 +3,4 @@ export * from './';
 export * from './bytemanip';
 export * from './databases';
 export * from './tagged-oma';
+export * from './devices';
