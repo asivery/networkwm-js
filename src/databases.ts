@@ -68,13 +68,11 @@ export class DatabaseManager {
     parsedGroupInfoFiles: {[fileName: string]: {trackId: number, oneElementLength: number, contents: {[key: string]: string}}[]} = {};
     globalContentInfoFile: { encryptionState: Uint8Array, codecInfo: Uint8Array, trackId: number, oneElementLength: number, contents: {[key: string]: string}}[] = [];
 
-    constructor(public himdFilesystem: HiMDFilesystem) {
-
-    }
+    constructor(public filesystem: HiMDFilesystem) {}
 
     async init(){
         for(let file of FILES_TO_LOAD) {
-            const fd = await this.himdFilesystem.open('OMGAUDIO/' + file, 'ro');
+            const fd = await this.filesystem.open('OMGAUDIO/' + file, 'ro');
             const contents = await fd.read();
             const table = parseTable(contents);
             this.tableFiles[file] = table;
@@ -230,7 +228,7 @@ export class DatabaseManager {
         this.reserializeTables();
         for(let filename in this.tableFiles){
             const tableContents = serializeTable(this.tableFiles[filename], filename.startsWith("01TREE"));
-            const fd = await this.himdFilesystem.open("OMGAUDIO/" + filename, 'rw');
+            const fd = await this.filesystem.open("OMGAUDIO/" + filename, 'rw');
             await fd.write(tableContents);
             await fd.close();
         }
@@ -342,26 +340,30 @@ export class DatabaseManager {
             // Otherwise all hell breaks loose.
             treeFile.mapStartBounds.sort((a, b) => a.firstTrackApplicableInTPLB - b.firstTrackApplicableInTPLB);
         }
+        this.reserializeTables();
 
         return newGlobalIndex;
     }
 
-    public listContent(): { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string }[]}[] {
+    protected getGlobalTrack(track: number) {
+        const globalTrack = this.globalContentInfoFile[track - 1];
+        return {
+            album: globalTrack.contents['TALB'],
+            artist: globalTrack.contents['TPE1'],
+            genre: globalTrack.contents['TCON'],
+            title: globalTrack.contents['TIT2'],
+            duration: Math.ceil(globalTrack.trackId / 1000),
+        };
+    }
+
+    // TODO: TRACK ORDERING
+
+    public listContentGroups(): { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number }[]}[] {
         const groupedEncountered: number[] = [];
-        const groups: { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string }[]}[] = [];
+        const groups: { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number }[]}[] = [];
         // 01TREE01.DAT is groups
         const tree = this.parsedTreeFiles["01TREE01.DAT"];
         const desc = this.parsedGroupInfoFiles["03GINF01.DAT"];
-
-        const getGlobalTrack = (track: number) => {
-            const globalTrack = this.globalContentInfoFile[track - 1];
-            return {
-                album: globalTrack.contents['TALB'],
-                artist: globalTrack.contents['TPE1'],
-                genre: globalTrack.contents['TCON'],
-                title: globalTrack.contents['TIT2'],
-            };
-        }
 
         for(let trackIndex = 0; trackIndex < tree.tplb.length; trackIndex++) {
             const track = tree.tplb[trackIndex];
@@ -379,14 +381,33 @@ export class DatabaseManager {
                 if(groups.length < gplbEntry) {
                     groups.push({ groupName: desc[gplbEntry - 1].contents['TIT2'], contents: []});
                 }
-                groups[gplbEntry - 1].contents.push(getGlobalTrack(track));
+                groups[gplbEntry - 1].contents.push(this.getGlobalTrack(track));
             }
         }
 
         let ungrouped = Array(this.globalContentInfoFile.length).fill(0).map((_, i) => i + 1).filter(e => !groupedEncountered.includes(e));
-        const ungroupedGroup = { groupName: null, contents: ungrouped.map(getGlobalTrack)};
+        const ungroupedGroup = { groupName: null, contents: ungrouped.map(this.getGlobalTrack.bind(this))};
         groups.splice(0, 0, ungroupedGroup);
 
         return groups;
+    }
+
+    public listContentArtists(): {[artist: string]: {[album: string]: {track: string, index: -1, duration: number}[]}} {
+        const artists: {[artist: string]: {[album: string]: {track: string, index: -1, duration: number}[]}} = {};
+        
+        for(let i = 1; i<=this.globalContentInfoFile.length; i++) {
+            const track = this.getGlobalTrack(i);
+            if(!(track.artist in artists)) {
+                artists[track.artist] = {};
+            }
+            const artist = artists[track.artist]!;
+            if(!(track.album in artist)) {
+                artist[track.album] = [];
+            }
+            const album = artist[track.album];
+            album.push({ track: track.title, index: -1, duration: track.duration });
+        }
+        
+        return artists;
     }
 }

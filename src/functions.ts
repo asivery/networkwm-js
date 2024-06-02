@@ -11,7 +11,8 @@ export async function uploadTrack(
     session: UMSCNWJSSession,
     trackInfo: {artist: string, album: string, title: string, genre: string},
     codec: CodecInfo,
-    rawData: Uint8Array
+    rawData: Uint8Array,
+    callback?: (done: number, outOf: number) => void
 ) {
     // Step 1 - Create the encrypted OMA which will later be written to the device's storage
     const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
@@ -20,8 +21,18 @@ export async function uploadTrack(
     const globalTrackIndex = database.addNewTrack(trackInfo, encryptedOMA.key, codec);
 
     // Step 3 - write track to the filesystem
-    const fh = await database.himdFilesystem.open(join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0') + '.OMA'), 'rw');
-    await fh.write(encryptedOMA.data);
+    const fh = await database.filesystem.open(join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0') + '.OMA'), 'rw');
+    const data = encryptedOMA.data;
+    let remaining = data.length;
+    let i = 0;
+    callback?.(i, data.length);
+    while(remaining) {
+        const toWrite = Math.min(2048, remaining);
+        await fh.write(data.slice(i, i + toWrite));
+        i += toWrite;
+        remaining -= toWrite;
+        callback?.(i, data.length);
+    }
     await fh.close();
 
     // Step 4 - write MAC
