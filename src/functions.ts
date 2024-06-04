@@ -6,6 +6,10 @@ import { createTaggedEncryptedOMA } from "./tagged-oma";
 import { join } from "./utils";
 import { DeviceIds } from "./devices";
 
+function resolvePathFromGlobalIndex(globalTrackIndex: number){
+    return join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
+}
+
 export async function uploadTrack(
     database: DatabaseManager,
     session: UMSCNWJSSession,
@@ -21,7 +25,7 @@ export async function uploadTrack(
     const globalTrackIndex = database.addNewTrack(trackInfo, encryptedOMA.key, codec);
 
     // Step 3 - write track to the filesystem
-    const fh = await database.filesystem.open(join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA'), 'rw');
+    const fh = await database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
     const data = encryptedOMA.data;
     let remaining = data.length;
     let i = 0;

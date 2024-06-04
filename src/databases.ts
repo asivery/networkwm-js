@@ -1,5 +1,5 @@
 import { getBEUint32, getBEUint32AsBytes } from "node-mass-storage";
-import { CodecInfo, HiMDFilesystem } from "himd-js";
+import { CodecInfo, HiMDFilesystem, getKBPS, getCodecName, HiMDCodecName } from "himd-js";
 
 import { getUint16, readBytes, readUint16, readUint32, writeUint16, writeUint32 } from "./bytemanip";
 import { encodeUTF16BEStringEA3 } from "./id3";
@@ -347,20 +347,27 @@ export class DatabaseManager {
 
     protected getGlobalTrack(track: number) {
         const globalTrack = this.globalContentInfoFile[track - 1];
+        const codecId = globalTrack.codecInfo[0];
+        const codecParams = globalTrack.codecInfo.slice(1);
+        const codecInfo = { codecId, codecInfo: codecParams };
+        const codecName = getCodecName(codecInfo);
+        const codecKBPS = getKBPS(codecInfo);
+
         return {
             album: globalTrack.contents['TALB'],
             artist: globalTrack.contents['TPE1'],
             genre: globalTrack.contents['TCON'],
             title: globalTrack.contents['TIT2'],
             duration: Math.ceil(globalTrack.trackId / 1000),
+            codecName, codecKBPS,
         };
     }
 
     // TODO: TRACK ORDERING
 
-    public listContentGroups(): { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number }[]}[] {
+    public listContentGroups(): { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number, codecName: HiMDCodecName, codecKBPS: number }[]}[] {
         const groupedEncountered: number[] = [];
-        const groups: { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number }[]}[] = [];
+        const groups: { groupName: string | null, contents: { title: string, artist: string, genre: string, album: string, duration: number, codecName: HiMDCodecName, codecKBPS: number }[]}[] = [];
         // 01TREE01.DAT is groups
         const tree = this.parsedTreeFiles["01TREE01.DAT"];
         const desc = this.parsedGroupInfoFiles["03GINF01.DAT"];
@@ -392,8 +399,8 @@ export class DatabaseManager {
         return groups;
     }
 
-    public listContentArtists(): {[artist: string]: {[album: string]: {track: string, index: -1, duration: number}[]}} {
-        const artists: {[artist: string]: {[album: string]: {track: string, index: -1, duration: number}[]}} = {};
+    public listContentArtists(): {[artist: string]: {[album: string]: {track: string, index: -1, duration: number, codecName: HiMDCodecName, codecKBPS: number }[]}} {
+        const artists: {[artist: string]: {[album: string]: {track: string, index: -1, duration: number, codecName: HiMDCodecName, codecKBPS: number}[]}} = {};
         
         for(let i = 1; i<=this.globalContentInfoFile.length; i++) {
             const track = this.getGlobalTrack(i);
@@ -405,7 +412,13 @@ export class DatabaseManager {
                 artist[track.album] = [];
             }
             const album = artist[track.album];
-            album.push({ track: track.title, index: -1, duration: track.duration });
+            album.push({
+                track: track.title,
+                index: -1,
+                duration: track.duration,
+                codecName: track.codecName,
+                codecKBPS: track.codecKBPS,
+            });
         }
         
         return artists;
