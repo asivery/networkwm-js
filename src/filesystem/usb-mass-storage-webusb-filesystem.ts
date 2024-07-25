@@ -3,7 +3,7 @@ import { assert, concatUint8Arrays, createRandomBytes } from '../utils';
 import { getUint32, writeUint16, writeUint32 } from '../bytemanip';
 import { createIcvMac, desDecrypt, EKBROOTS, retailMac } from '../encryption';
 import { WebUSBDevice } from 'usb';
-import { FatFilesystem } from 'nufatfs';
+import { createChunkingDriver, FatFilesystem } from 'nufatfs';
 
 export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
     protected async drmRead(param: number, length: number) {
@@ -205,29 +205,9 @@ export class UMSCNWJSFilesystem extends UMSCHiMDFilesystem {
         await this.driver.testUnitReady();
         const partInfo = await this.driver.getCapacity();
         console.log(partInfo);
-        this.fsUncachedDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(0, true);
 
-        this.fsDriver = {...this.fsUncachedDriver,
-            readSectors: async (i: number, count: number) => {
-                let outputBuffers: Uint8Array[] = [];
-                while(count > 0){
-                    let toRead = Math.min(count, 100);
-                    outputBuffers.push(await this.fsUncachedDriver!.readSectors(i, toRead));
-                    i += toRead;
-                    count -= toRead;
-                }
-                return concatUint8Arrays(outputBuffers);
-            },
-            writeSectors: async (i: number, data: Uint8Array) => {
-                let offset = 0;
-                while(offset < data.length) {
-                    let toWrite = data.subarray(offset, Math.min(data.length, offset + partInfo.blockSize * 10));
-                    await this.fsUncachedDriver!.writeSectors!(i, toWrite);
-                    offset += toWrite.length;
-                    i += toWrite.length / partInfo.blockSize;
-                }
-            }
-        };
+        const baseDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(0, true);
+        this.fsUncachedDriver = this.fsDriver = createChunkingDriver(baseDriver, 10, partInfo.blockSize);
 
         this.fatfs = await FatFilesystem.create(this.fsDriver, bypassCoherencyChecks);
         this.volumeSize = partInfo.deviceSize;
