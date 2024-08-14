@@ -45,7 +45,12 @@ function createEncryptionHeader(titleInfo: {artist: string, album: string, title
     // In every KEYRING section, the track key is stored as decrypted by the verification key decrypted by the ekbroot
     const padding = createRandomBytes(8); // What's this???
     const keyringDataA = concatUint8Arrays([
-        new Uint8Array([0x00, 0x28, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x21]), // Use EKB 00010021
+        new Uint8Array([
+            0x00, 0x28, 0x00, 0x01,
+            0x00, 0x03, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x01, 0x00, 0x21,
+        ]), // Use EKB 00010021
         verificationKey, createTrackKeyForKeyring(0x00010021, verificationKey, actualTrackKey), padding,
         new Uint8Array(8).fill(0),
     ]);
