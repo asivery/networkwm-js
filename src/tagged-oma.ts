@@ -126,5 +126,5 @@ export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: {artist
     const allData = Crypto.DES.encrypt(blockWa, keyWa, { mode: Crypto.mode.CBC, iv: ivWa });
     rawData = wordArrayToByteArray(allData.ciphertext, rawData.length);
 
-    return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, key: milliseconds };
+    return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, duration: milliseconds };
 }

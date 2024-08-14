@@ -53,6 +53,7 @@ function writePackedTags(tags: {[key: string]: string}, elementLength: number){
     let offset = 0;
     let content = new Uint8Array(Object.keys(tags).length * elementLength)
     for(let [k, v] of Object.entries(tags)){
+        if(k.startsWith("_")) continue;
         content.set(textEncoder.encode(k), offset);
         offset += 4;
         content.set(encodeUTF16BEStringEA3(v, true), offset + 1);
@@ -62,11 +63,15 @@ function writePackedTags(tags: {[key: string]: string}, elementLength: number){
     return content;
 }
 
+export interface TreeFile {mapStartBounds: { firstTrackApplicableInTPLB: number, groupInfoIndex: number, flags: number }[], tplb: number[]}
+export interface ContentEntry { encryptionState: Uint8Array, codecInfo: Uint8Array, trackDuration: number, oneElementLength: number, contents: {[key: string]: string}}
+export interface GroupEntry {totalDuration: number, oneElementLength: number, contents: {[key: string]: string}};
+export interface TrackMetadata {album: string, artist: string, title: string, genre: string, trackDuration: number, trackNumber: number}
 export class DatabaseManager {
     tableFiles: {[fileName: string]: TableFile} = {}
-    parsedTreeFiles: {[fileName: string]: {mapStartBounds: { firstTrackApplicableInTPLB: number, groupInfoIndex: number, flags: number }[], tplb: number[]}} = {};
-    parsedGroupInfoFiles: {[fileName: string]: {trackId: number, oneElementLength: number, contents: {[key: string]: string}}[]} = {};
-    globalContentInfoFile: { encryptionState: Uint8Array, codecInfo: Uint8Array, trackId: number, oneElementLength: number, contents: {[key: string]: string}}[] = [];
+    parsedTreeFiles: {[fileName: string]: TreeFile} = {};
+    parsedGroupInfoFiles: {[fileName: string]: GroupEntry[]} = {};
+    globalContentInfoFile: ContentEntry[] = [];
 
     constructor(public filesystem: HiMDFilesystem) {}
 
@@ -98,7 +103,7 @@ export class DatabaseManager {
                     let contents;
                     [contents, offset] = readPackedTags(data, offset, elementsCount, elementLength);
                     // Bundle the info
-                    this.parsedGroupInfoFiles[file].push({trackId, oneElementLength: elementLength, contents});
+                    this.parsedGroupInfoFiles[file].push({totalDuration: trackId, oneElementLength: elementLength, contents});
                 }
             } else if(file.startsWith("01TREE")){
                 // Tree file. Parse
@@ -149,12 +154,12 @@ export class DatabaseManager {
                 [elementLength, offset] = readUint16(data, offset);
                 [contents, offset] = readPackedTags(data, offset, elementsCount, elementLength);
                 assert(zeros.every(e => e === 0), "Unexpected data in root content block header");
-                this.globalContentInfoFile.push({codecInfo, contents, oneElementLength: elementLength, encryptionState, trackId});
+                this.globalContentInfoFile.push({codecInfo, contents, oneElementLength: elementLength, encryptionState, trackDuration: trackId});
             }
         }
     }
 
-    protected reserializeTables(){
+    public reserializeTables(){
         // Write global content info file
         {
             const rootTable = this.tableFiles["04CNTINF.DAT"];
@@ -168,7 +173,7 @@ export class DatabaseManager {
                 offset += 2;
                 content.set(contentBlock.codecInfo, offset);
                 offset += 4;
-                content.set(writeUint32(contentBlock.trackId), offset);
+                content.set(writeUint32(contentBlock.trackDuration), offset);
                 offset += 4;
                 content.set(writeUint16(Object.keys(contentBlock.contents).length), offset);
                 offset += 2;
@@ -188,7 +193,7 @@ export class DatabaseManager {
             for(let element of parsed){
                 let content = new Uint8Array(table.contents[0].oneElementLength).fill(0);
                 let offset = 8;
-                content.set(writeUint32(element.trackId), offset);
+                content.set(writeUint32(element.totalDuration), offset);
                 offset += 4;
                 content.set(writeUint16(Object.keys(element.contents).length), offset);
                 offset += 2;
@@ -234,7 +239,7 @@ export class DatabaseManager {
         }
     }
 
-    public addNewTrack(titleInfo: {album: string, artist: string, title: string, genre: string}, key: number, codecInfo: CodecInfo) {
+    public addNewTrack(titleInfo: TrackMetadata, codecInfo: CodecInfo) {
         // Form new contents entry
         const contentsEntry = {
             codecInfo: new Uint8Array([codecInfo.codecId, ...codecInfo.codecInfo.subarray(0, 3)]),
@@ -247,17 +252,17 @@ export class DatabaseManager {
             },
             oneElementLength: 128,
             encryptionState: new Uint8Array([0, 1]),
-            trackId: key,
+            trackDuration: titleInfo.trackDuration,
         };
 
         // Rewrite the tree info files
         // We'll need to know the current (old) global key for that
-        const oldGlobalKey = this.globalContentInfoFile.reduce((a, b) => a + b.trackId, 0);
+        const oldGlobalKey = this.globalContentInfoFile.reduce((a, b) => a + b.trackDuration, 0);
 
         // Now that we know the old global key, we can push this track to the global list.
         const newGlobalIndex = this.globalContentInfoFile.push(contentsEntry);
 
-        const newKeyAsUint = getBEUint32AsBytes(oldGlobalKey + contentsEntry.trackId);
+        const newKeyAsUint = getBEUint32AsBytes(oldGlobalKey + contentsEntry.trackDuration);
         for(let entry of this.tableFiles["02TREINF.DAT"].contents[0].elements.slice(0, 4)){
             // After index 4, there be dragons
             if(getBEUint32(entry.slice(8, 8+4)) === oldGlobalKey){
@@ -269,7 +274,7 @@ export class DatabaseManager {
 
         // Tree01 is just groups, so we can add this new track to a new group.
         const newGroup = {
-            trackId: contentsEntry.trackId,
+            totalDuration: contentsEntry.trackDuration,
             oneElementLength: 128,
             contents: {
                 TIT2: 'New Group (NWJS)',
@@ -294,9 +299,9 @@ export class DatabaseManager {
             let needsWriteGPLB = false;
             if(thisEntryIndex === -1){
                 needsWriteGPLB = true;
-                thisEntryIndex = descFile.push({ trackId: 0, contents: { TIT2: newResolvedEntries[i]! }, oneElementLength: 128 }) - 1;
+                thisEntryIndex = descFile.push({ totalDuration: 0, contents: { TIT2: newResolvedEntries[i]! }, oneElementLength: 128 }) - 1;
             }
-            descFile[thisEntryIndex].trackId += key;
+            descFile[thisEntryIndex].totalDuration += titleInfo.trackDuration;
 
             const sortedGPLBEntries = treeFile.mapStartBounds.map((e, i) => [e, i] as [typeof e, number]).sort((a, b) => b[0].firstTrackApplicableInTPLB - a[0].firstTrackApplicableInTPLB);
 
@@ -358,9 +363,19 @@ export class DatabaseManager {
             artist: globalTrack.contents['TPE1'],
             genre: globalTrack.contents['TCON'],
             title: globalTrack.contents['TIT2'],
-            duration: Math.ceil(globalTrack.trackId / 1000),
+            duration: Math.ceil(globalTrack.trackDuration / 1000),
             codecName, codecKBPS,
         };
+    }
+
+    public rewriteTotalDuration(oldValue: number, newValue: number) {
+        const newKeyAsUint = getBEUint32AsBytes(newValue);
+        for(let entry of this.tableFiles["02TREINF.DAT"].contents[0].elements.slice(0, 4)){
+            // After index 4, there be dragons
+            if(getBEUint32(entry.slice(8, 8+4)) === oldValue){
+                entry.set(newKeyAsUint, 8);
+            }
+        }
     }
 
     // TODO: TRACK ORDERING

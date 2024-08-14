@@ -1,31 +1,34 @@
 import { CodecInfo } from "himd-js";
 import { WebUSBDevice, findByIds } from "usb";
-import { DatabaseManager } from "./databases";
+import { TrackMetadata } from "./databases";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA } from "./tagged-oma";
 import { join } from "./utils";
 import { DeviceIds } from "./devices";
+import { DatabaseAbstraction } from "./database-abstraction";
 
 function resolvePathFromGlobalIndex(globalTrackIndex: number){
     return join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
 }
 
 export async function uploadTrack(
-    database: DatabaseManager,
+    database: DatabaseAbstraction,
     session: UMSCNWJSSession,
-    trackInfo: {artist: string, album: string, title: string, genre: string},
+    trackInfo: TrackMetadata,
     codec: CodecInfo,
     rawData: Uint8Array,
     callback?: (done: number, outOf: number) => void
 ) {
     // Step 1 - Create the encrypted OMA which will later be written to the device's storage
     const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
-    
     // Step 2 - write track to the database
-    const globalTrackIndex = database.addNewTrack(trackInfo, encryptedOMA.key, codec);
+    const globalTrackIndex = database.addNewTrack({
+        ...trackInfo,
+        trackDuration: encryptedOMA.duration,
+    }, codec);
 
     // Step 3 - write track to the filesystem
-    const fh = await database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
+    const fh = await database.database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
     const data = encryptedOMA.data;
     let remaining = data.length;
     let i = 0;
