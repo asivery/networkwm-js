@@ -6,6 +6,7 @@ import { createTaggedEncryptedOMA } from "./tagged-oma";
 import { join } from "./utils";
 import { DeviceIds } from "./devices";
 import { DatabaseAbstraction } from "./database-abstraction";
+import { initializeIfNeeded } from "./initialization";
 
 function resolvePathFromGlobalIndex(globalTrackIndex: number){
     return join('OMGAUDIO', '10F00', '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
@@ -51,6 +52,7 @@ export async function createNWJSFS(webUsbDevice: WebUSBDevice, bypassCoherencyCh
     const fs = new UMSCNWJSFilesystem(webUsbDevice);
 
     await fs.init();
+    await initializeIfNeeded(fs);
     return fs;
 }
 
