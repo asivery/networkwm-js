@@ -1,6 +1,6 @@
 export type ComplexSortGroupedResult<T> =
   | T[]
-  | { name: string, contents: ComplexSortGroupedResult<T> }[];
+  | { name: string, contents: ComplexSortGroupedResult<T>, __complexSortGroupedResult: 1 }[];
 
 export type ComplexSortFormatPart = { var: string } | { literal: string };
 
@@ -38,6 +38,7 @@ export function complexSort<T>(
             .sort((a, b) => a[0].localeCompare(b[0]))
             .reduce<[string, string[]][]>((p, c) => (!p.some(e => e[1].every((z: string, i: number) => c[1][i] === z)) ? [...p, c] : p), [])
             .map(e => ({
+                __complexSortGroupedResult: 1 as const,
                 name: e[0],
                 contents: complexSort(nextFormat,
                     data.filter((z: any) => formatCompliance
@@ -46,4 +47,20 @@ export function complexSort<T>(
                 )
             }));
     }
+}
+
+export function flatten<T>(data: ComplexSortGroupedResult<T>): T[] {
+    let finalArray: T[] = [];
+    if(!data.length) return finalArray;
+    if((<any> data[0]).__complexSortGroupedResult == 1) {
+        // This is a nested result
+        for(let subContent of <{contents: ComplexSortGroupedResult<T>}[]>data) {
+            finalArray.push(...flatten(subContent.contents));
+        }
+    } else {
+        // Normal
+        finalArray.push(...<T[]>data);
+    }
+
+    return finalArray;
 }

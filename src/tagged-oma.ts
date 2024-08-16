@@ -1,9 +1,10 @@
 import Crypto from '@originjs/crypto-js-wasm';
 
-import { getBytesPerFrame, getSeconds, HiMDCodec } from "himd-js";
+import { getBytesPerFrame, getSeconds, HiMDCodec, HiMDFile, HiMDFilesystemEntry } from "himd-js";
 import { concatUint8Arrays, createEA3Header, createRandomBytes, wordArrayToByteArray } from "./utils";
-import { encodeUTF16BEStringEA3, ID3Tags, serialize } from "./id3";
+import { encodeUTF16BEStringEA3, ID3Tags, parse, readSynchsafeInt32, serialize } from "./id3";
 import { createTrackKeyForKeyring, createTrackMac2, EKBROOTS } from "./encryption";
+import { TrackMetadata } from './databases';
 
 const textEncoder = new TextEncoder();
 
@@ -39,7 +40,7 @@ function createSonyGEOB(geobName: string, header: Uint8Array, kvmap: { name: str
     return concatUint8Arrays(dataSlices);
 }
 
-function createEncryptionHeader(titleInfo: {artist: string, album: string, title: string, genre: string}, milliseconds: number) {
+function createEncryptionHeader(titleInfo: TrackMetadata, milliseconds: number) {
     const verificationKey = createRandomBytes(8);
     const actualTrackKey = createRandomBytes(8);
     // In every KEYRING section, the track key is stored as decrypted by the verification key decrypted by the ekbroot
@@ -118,7 +119,7 @@ function createEncryptionHeader(titleInfo: {artist: string, album: string, title
     return { contents: serialize(id3Info), trackEncryptionKey: actualTrackKey, maclistValue };
 }
 
-export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: {artist: string, album: string, title: string, genre: string}, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}){
+export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: TrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}){
     const formatHeader = createEA3Header(codec, true);
     const milliseconds = Math.floor(1000 * getSeconds(codec, Math.ceil(rawData.length / getBytesPerFrame(codec))));
     const { contents: encHeader, trackEncryptionKey, maclistValue } = createEncryptionHeader(titleInfo, milliseconds);
@@ -132,4 +133,58 @@ export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: {artist
     rawData = wordArrayToByteArray(allData.ciphertext, rawData.length);
 
     return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, duration: milliseconds };
+}
+
+export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
+    // Read the first 10 bytes to get the encryption header's size.
+    const ea3Header = await file.read(10);
+    if(ea3Header.length !== 10) throw new Error("Invalid header");
+    const headerSizeRemaining = readSynchsafeInt32(new DataView(ea3Header.buffer), 6)[0];
+    const fullEncryptionHeader = concatUint8Arrays([ea3Header, await file.read(headerSizeRemaining)]);
+    const subsequentData = await file.read();
+    const metadata = parse(fullEncryptionHeader);
+    function findInMetadata(id: string, asGeob: boolean) {
+        if(!asGeob) return metadata.tags.find(e => e.id === id);
+        return metadata.tags.filter(e => e.id === "GEOB")
+            .find(e => {
+                if(e.contents[0] !== 0x02) return false;
+                // This is a valid Sony crypto block
+                for(let i = 0; i<id.length * 2; i += 2) {
+                    if(e.contents[i + 11] !== id.charCodeAt(i / 2)) return false;
+                }
+                return true;
+            });
+    }
+
+    const tlen = findInMetadata("TLEN", false);
+    const ulinf = findInMetadata("OMG_ULINF", true);
+    const bklsi = findInMetadata("OMG_BKLSI", true);
+
+    if(!ulinf || !bklsi || !tlen) throw new Error("Not a valid encrypted OMA");
+
+    const newMetadataBlock: ID3Tags = {
+        flags: metadata.flags,
+        version: metadata.version,
+        tags: [
+            ulinf,
+            {id: "TIT2", contents: encodeUTF16BEStringEA3(titleInfo.title), flags: 0},
+            {id: "TPE1", contents: encodeUTF16BEStringEA3(titleInfo.artist), flags: 0},
+            {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
+            {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
+            {id: "TCON", contents: encodeUTF16BEStringEA3(titleInfo.genre), flags: 0},
+            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TPE1S", titleInfo.artist), flags: 0},
+            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TRACK", '0'), flags: 0},
+            {id: "TXXX", contents: encodeSonyWeirdString("OMG_ALBMS", titleInfo.album), flags: 0},
+            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TIT2S", titleInfo.title), flags: 0},
+            tlen,
+            bklsi,
+        ]
+    };
+    const serialized = serialize(newMetadataBlock);
+    // Rewrite the file
+    const zeroOutDifference = Math.max(0, fullEncryptionHeader.length - serialized.length);
+    await file.seek(0);
+    await file.write(serialized);
+    await file.write(subsequentData);
+    await file.write(new Uint8Array(zeroOutDifference).fill(0));
 }

@@ -213,7 +213,7 @@ export class UMSCNWJSFilesystem extends UMSCHiMDFilesystem {
         console.log(partInfo);
 
         const baseDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(0, true);
-        this.fsUncachedDriver = this.fsDriver = createChunkingDriver(baseDriver, 10, partInfo.blockSize);
+        this.fsUncachedDriver = this.fsDriver = createChunkingDriver(baseDriver, 240, partInfo.blockSize);
 
         this.fatfs = await FatFilesystem.create(this.fsDriver, bypassCoherencyChecks);
         this.volumeSize = partInfo.deviceSize;

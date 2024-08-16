@@ -15,7 +15,7 @@ export interface ID3Tags {
     flags: number,
 }
 
-function readSynchsafeInt32(data: DataView, offset: number): [number, number]{
+export function readSynchsafeInt32(data: DataView, offset: number): [number, number]{
     let value = 0;
     let byte;
     [byte, offset] = readUint8(data, offset);
@@ -52,7 +52,7 @@ export function parse(buffer: Uint8Array): ID3Tags{
     const tags: ID3Tag[] = [];
 
     // Parse frames
-    while (offset < size + 10) {
+    while ((offset + 10) < size + 10) {
         let frameId, frameSize, frameFlags, frameContents;
         [frameId, offset] = readBytes(data, offset, 4);
         [frameSize, offset] = readUint32(data, offset);

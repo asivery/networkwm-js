@@ -1,34 +1,53 @@
-import { CodecInfo } from "himd-js";
+import { CodecInfo, HiMDCodecName, HiMDFilesystem, getCodecName, getKBPS } from "himd-js";
 import { DatabaseManager, GroupEntry, TrackMetadata, TreeFile } from "./databases";
-import { complexSort, ComplexSortFormatPart } from "./sort";
+import { complexSort, ComplexSortFormatPart, flatten } from "./sort";
+import { initializeNW } from "./initialization";
+import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
+import { createTaggedEncryptedOMA, updateMetadata } from "./tagged-oma";
+import { resolvePathFromGlobalIndex } from "./helpers";
 
-type AbstractedTrack = TrackMetadata & {
+export type AbstractedTrack = TrackMetadata & {
     encryptionState: Uint8Array,
     codecInfo: Uint8Array,
     oneElementLength: number,
     systemIndex: number,
+
+    codecName: HiMDCodecName,
+    codecKBPS: number,
 };
 
 export class DatabaseAbstraction {
-    private content1ArtistAlbumTrack: ContentDescriptionPair;
-    private allTracks: AbstractedTrack[] = [];
+    private content1ArtistAlbumTrack?: ContentDescriptionPair;
     private lastTotalDuration: number = 0;
-    public constructor(public database: DatabaseManager) {
-        this.content1ArtistAlbumTrack = contentDescriptionPairFromFiles(
-            database.parsedTreeFiles["01TREE03.DAT"],
-            database.parsedGroupInfoFiles["03GINF03.DAT"],
-        );
-        this.create();
-        console.log(complexSort([[{ var: 'TPE1' }, { literal: ' - '}, { var: 'TALB'}], [{ var: 'TALB'}], [{var: 'TIT2'}]], database.globalContentInfoFile.map(e => e.contents)));
+    private allTracks: AbstractedTrack[] = [];
+    public database: DatabaseManager;
+    private constructor(private filesystem: HiMDFilesystem) {
+        this.database = new DatabaseManager(filesystem);
     }
 
-    private create() {
+    public static async create(filesystem: HiMDFilesystem) {
+        const db = new DatabaseAbstraction(filesystem);
+        await db.database.init();
+        db._create();
+        return db;
+    }
+
+    private _create() {
         // Parse the group info file.
         this.lastTotalDuration = 0;
+        this.content1ArtistAlbumTrack = contentDescriptionPairFromFiles(
+            this.database.parsedTreeFiles["01TREE03.DAT"],
+            this.database.parsedGroupInfoFiles["03GINF03.DAT"],
+        );
         this.allTracks = this.database.globalContentInfoFile.map((globalEntry, systemIndex) => {
             // Locate the track index
-            const trackIndex = this.content1ArtistAlbumTrack.find(e => e.tracks.includes(systemIndex + 1))?.tracks.indexOf(systemIndex + 1) ?? 1;
+            const trackIndex = this.content1ArtistAlbumTrack!.find(e => e.tracks.includes(systemIndex + 1))?.tracks.indexOf(systemIndex + 1) ?? 1;
             this.lastTotalDuration += globalEntry.trackDuration;
+            const codecId = globalEntry.codecInfo[0];
+            const codecParams = globalEntry.codecInfo.slice(1);
+            const codecInfo = { codecId, codecInfo: codecParams };
+            const codecName = getCodecName(codecInfo);
+            const codecKBPS = getKBPS(codecInfo);
             return {
                 album: globalEntry.contents["TALB"],
                 artist: globalEntry.contents["TPE1"],
@@ -40,32 +59,87 @@ export class DatabaseAbstraction {
                 trackDuration: globalEntry.trackDuration,
                 trackNumber: trackIndex,
                 systemIndex: systemIndex + 1,
+                codecName, codecKBPS
             };
         });
     }
 
     public addNewTrack(trackInfo: TrackMetadata, codecInfo: CodecInfo) {
+        const codecName = getCodecName(codecInfo);
+        const codecKBPS = getKBPS(codecInfo);
+
         const newObject: AbstractedTrack = {
             ...trackInfo,
             codecInfo: new Uint8Array([codecInfo.codecId, ...codecInfo.codecInfo.subarray(0, 3)]),
             encryptionState: new Uint8Array([0, 1]),
             oneElementLength: 128,
             systemIndex: -1,
+            codecName, codecKBPS
         };
         const idx = this.allTracks.push(newObject);
         newObject.systemIndex = idx;
         return newObject.systemIndex;
     }
 
-    public reserializeDatabase() {
-        // TREE01 - {album} - {trackIndex}
+    async uploadTrack(
+        trackInfo: TrackMetadata,
+        codec: CodecInfo,
+        rawData: Uint8Array,
+        session?: UMSCNWJSSession,
+        callback?: (done: number, outOf: number) => void
+    ) {
+        // If trackInfo.trackNumber == -1, it's the next one of this particular album
+        if(trackInfo.trackNumber == -1) {
+            trackInfo.trackNumber = this.allTracks
+                .filter(e => e.album === trackInfo.album && e.artist === trackInfo.artist)
+                .reduce((prev, c) => Math.max(prev, c.trackNumber), -1) + 1;
+        }
+        // Step 1 - Create the encrypted OMA which will later be written to the device's storage
+        const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
+        // Step 2 - write track to the database
+        const globalTrackIndex = this.addNewTrack({
+            ...trackInfo,
+            trackDuration: encryptedOMA.duration,
+        }, codec);
+    
+        // Step 3 - write track to the filesystem
+        const fh = await this.database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
+        const data = encryptedOMA.data;
+        let remaining = data.length;
+        let i = 0;
+        callback?.(i, data.length);
+        while(remaining) {
+            const toWrite = Math.min(2048, remaining);
+            await fh.write(data.slice(i, i + toWrite));
+            i += toWrite;
+            remaining -= toWrite;
+            callback?.(i, data.length);
+        }
+        await fh.close();
+
+        // Step 4 - write MAC
+        session?.writeTrackMac(globalTrackIndex - 1, encryptedOMA.maclistValue);
+    }
+
+    async flushUpdates() {
+        this.reserializeDatabase();
+        this.database.reserializeTables();
+        return this.database.rewriteTables();
+    }
+
+    async deleteTracks(systemIndex: number) {
+        
+    }
+
+    reserializeDatabase() {
+        // TREE01 - {album} - {trackNumber}
         type ReserializationInstruction = {
             metadataCreator: (track: AbstractedTrack) => {[key: string]: string},
             sorting: ComplexSortFormatPart[][]
         };
-        
+
         const instrs: ReserializationInstruction[] = [
-            // TREE01 - Groups (I use [aritst - album] > [trackIndex])
+            // TREE01 - Groups (I use [aritst - album] > [trackNumber])
             {
                 metadataCreator: e => ({
                     TIT2: e.album,
@@ -75,17 +149,17 @@ export class DatabaseAbstraction {
                     PICP: '',
                     PIC0: '',
                 }),
-                sorting: [[{ var: 'artist' }, { literal: '-----'}, { var: 'album' }], [{ var: 'trackIndex'}]],
+                sorting: [[{ var: 'artist' }, { literal: '-----'}, { var: 'album' }], [{ var: 'tractrackNumberkIndex'}]],
             },
             // TREE02 - [artist] > [title]
             {
                 metadataCreator: e => ({ TIT2: e.artist }),
                 sorting: [[{ var: 'artist' }], [{ var: 'title'}]],
             },
-            // TREE03 - [album] > [trackIndex]
+            // TREE03 - [album] > [trackNumber]
             {
                 metadataCreator: e => ({ TIT2: e.album }),
-                sorting: [[{ var: 'album' }], [{ var: 'trackIndex' }]],
+                sorting: [[{ var: 'album' }], [{ var: 'trackNumber' }]],
             },
             // TREE04 - [genre] > [title]
             // ...who came up with this order??
@@ -132,6 +206,59 @@ export class DatabaseAbstraction {
         let newDuration = this.allTracks.reduce((a, v) => a + v.trackDuration, 0);
         this.database.rewriteTotalDuration(this.lastTotalDuration, newDuration);
         this.lastTotalDuration = newDuration;
+    }
+
+    getTracksSortedArtistAlbum() : {
+        __complexSortGroupedResult: 1,
+        name: string,
+        contents: {
+            __complexSortGroupedResult: 1,
+            name: string,
+            contents: AbstractedTrack[]
+        }[]
+    }[] {
+        return <any> complexSort([[{ var: 'artist' }], [{ var: 'album' }], [{ var: 'trackNumber' }]], this.allTracks);
+    }
+
+    async eraseAll() {
+        // Essentially reinitialize the filesystem.
+        // Destroy all audio files
+        const fs = this.database.filesystem;
+        // Due to how HIMDFilesystem abstraction works, delete() would immediately flush the FAT changes.
+        // Here, they will be cached.
+        const fsDelete = (fs instanceof UMSCNWJSFilesystem) ? fs.fatfs!.delete.bind(fs.fatfs) : fs.delete.bind(fs);
+        async function recurseDelete(dir: string) {
+            for(let file of await fs.list(dir)) {
+                if(file.type === 'directory') {
+                    await recurseDelete(file.name);
+                } else {
+                    await fsDelete(file.name);
+                }
+            }
+            await fsDelete(dir);
+        }
+
+        await recurseDelete("/OMGAUDIO");
+        if(fs instanceof UMSCNWJSFilesystem) {
+            await fs.fatfs!.flushMetadataChanges()
+        }
+
+        await initializeNW(fs);
+        this.database = new DatabaseManager(this.filesystem);
+        await this.database.init();
+        this._create();
+    }
+
+    async renameTrack(systemIndex: number, metadata: TrackMetadata) {
+        this.allTracks[systemIndex - 1].album = metadata.album;
+        this.allTracks[systemIndex - 1].artist = metadata.artist;
+        this.allTracks[systemIndex - 1].title = metadata.title;
+        this.allTracks[systemIndex - 1].trackNumber = metadata.trackNumber;
+        // TODO: Is this necessary??
+        // Update the metadata within the OMA file
+        const handle = await this.database.filesystem.open(resolvePathFromGlobalIndex(systemIndex), 'rw');
+        if(!handle) return;
+        await updateMetadata(handle, metadata);
     }
 }
 
