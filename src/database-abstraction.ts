@@ -20,6 +20,7 @@ export class DatabaseAbstraction {
     private content1ArtistAlbumTrack?: ContentDescriptionPair;
     private lastTotalDuration: number = 0;
     private allTracks: AbstractedTrack[] = [];
+    private deletedTracks: number[] = [];
     public database: DatabaseManager;
     private constructor(private filesystem: HiMDFilesystem) {
         this.database = new DatabaseManager(filesystem);
@@ -39,6 +40,7 @@ export class DatabaseAbstraction {
             this.database.parsedTreeFiles["01TREE03.DAT"],
             this.database.parsedGroupInfoFiles["03GINF03.DAT"],
         );
+        this.deletedTracks = [];
         this.allTracks = this.database.globalContentInfoFile.map((globalEntry, systemIndex) => {
             // Locate the track index
             const trackIndex = this.content1ArtistAlbumTrack!.find(e => e.tracks.includes(systemIndex + 1))?.tracks.indexOf(systemIndex + 1) ?? 1;
@@ -48,6 +50,7 @@ export class DatabaseAbstraction {
             const codecInfo = { codecId, codecInfo: codecParams };
             const codecName = getCodecName(codecInfo);
             const codecKBPS = getKBPS(codecInfo);
+            if(globalEntry.trackDuration === 0) this.deletedTracks.push(systemIndex + 1);
             return {
                 album: globalEntry.contents["TALB"],
                 artist: globalEntry.contents["TPE1"],
@@ -76,6 +79,14 @@ export class DatabaseAbstraction {
             systemIndex: -1,
             codecName, codecKBPS
         };
+        // Do we have any free gaps after deleted tracks?
+        if(this.deletedTracks.length > 0) {
+            // Reuse it instead.
+            const reusedIndex = this.deletedTracks.splice(0, 1)[0];
+            this.allTracks.splice(reusedIndex - 1, 1, newObject);
+            newObject.systemIndex = reusedIndex;
+            return reusedIndex;
+        }
         const idx = this.allTracks.push(newObject);
         newObject.systemIndex = idx;
         return newObject.systemIndex;
@@ -127,8 +138,18 @@ export class DatabaseAbstraction {
         return this.database.rewriteTables();
     }
 
-    async deleteTracks(systemIndex: number) {
-        
+    async deleteTrack(systemIndex: number) {
+        const track = this.allTracks[systemIndex - 1];
+        // Wipe metadata information.
+        track.trackDuration = 0;
+        track.album = "";
+        track.artist = "";
+        track.title = "";
+        this.deletedTracks.push(systemIndex);
+        // Sort
+        this.deletedTracks.sort((a, b) => a - b);
+        // Delete the file.
+        await this.filesystem.delete(resolvePathFromGlobalIndex(systemIndex));
     }
 
     reserializeDatabase() {
@@ -171,7 +192,7 @@ export class DatabaseAbstraction {
 
         for(let fileIndex = 0; fileIndex < instrs.length; fileIndex++) {
             const sortingInstr = instrs[fileIndex];
-            const sorted = complexSort(sortingInstr.sorting, this.allTracks);
+            const sorted = complexSort(sortingInstr.sorting, this.allTracks.filter(e => e.trackDuration > 0));
             const entries: ContentDescriptionPair = [];
             for(const _group of sorted) {
                 const group = _group as { contents: AbstractedTrack[] };
@@ -217,7 +238,7 @@ export class DatabaseAbstraction {
             contents: AbstractedTrack[]
         }[]
     }[] {
-        return <any> complexSort([[{ var: 'artist' }], [{ var: 'album' }], [{ var: 'trackNumber' }]], this.allTracks);
+        return <any> complexSort([[{ var: 'artist' }], [{ var: 'album' }], [{ var: 'trackNumber' }]], this.allTracks.filter(e => e.trackDuration > 0));
     }
 
     async eraseAll() {
