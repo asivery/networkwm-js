@@ -35,8 +35,7 @@ async function example(){
     // When using Node.JS:
     const fs = new NativeHiMDFilesystem("/path/to/HiMD/root");
 
-    const db = new DatabaseManager(fs);
-    await db.init();
+    const database = await DatabaseAbstraction.create(fs);
 }
 ```
 
@@ -63,21 +62,21 @@ async function example(){
     const session = new UMSCNWJSSession(fs.driver as SonyVendorNWJSUSMCDriver, fs);
     await session.performAuthorization();
 
-    const database = new DatabaseManager(fs);
-    await database.init();
+    const database = await DatabaseAbstraction.create(fs);
 
     // Read the track
     const trackContents = new Uint8Array(nodeFs.readFileSync("/path/to/raw/atrac.wav")).slice(0x60);
     const codec = generateCodecInfo("A3+", HiMDKBPSToFrameSize.atrac3plus[352]);
-    await uploadTrack(database, session, {
+    database.uploadTrack({
         album: "Foobar - The Greatest Hits",
         artist: "Foobaz",
         genre: "Bar",
         title: "Foobar",
-    }, codec, trackContents);
+        trackDuration: -1,
+        trackNumber: -1, // Guess the track number
+    }, codec, trackContents, session);
 
-    database.reserializeTables();
-    await database.rewriteTables();
+    await database.flushUpdates();
     await session.finalizeSession();
 }
 ```
