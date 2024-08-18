@@ -32,7 +32,7 @@ export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, name: st
     }
 
     legacyDevice.open();
-    await new Promise(res => legacyDevice.reset(res));
+    await new Promise(res => legacyDevice!.reset(res));
     const iface = legacyDevice.interface(0);
     try{
         if(iface.isKernelDriverActive())
