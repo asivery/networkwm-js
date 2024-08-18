@@ -170,7 +170,7 @@ export class DatabaseAbstraction {
                     PICP: '',
                     PIC0: '',
                 }),
-                sorting: [[{ var: 'artist' }, { literal: '-----'}, { var: 'album' }], [{ var: 'tractrackNumberkIndex'}]],
+                sorting: [[{ var: 'artist' }, { literal: '-----'}, { var: 'album' }], [{ var: 'trackNumber'}]],
             },
             // TREE02 - [artist] > [title]
             {

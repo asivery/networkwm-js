@@ -1,4 +1,4 @@
-import { WebUSBDevice, findByIds } from "usb";
+import { WebUSBDevice, findByIds, usb } from "usb";
 import { UMSCNWJSFilesystem } from "./filesystem";
 import { join } from "./utils";
 import { DeviceIds } from "./devices";
@@ -18,7 +18,7 @@ export async function createNWJSFS(webUsbDevice: WebUSBDevice, bypassCoherencyCh
 }
 
 export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, name: string } | null> {
-    let legacyDevice: any, devName: string | null = null;
+    let legacyDevice: usb.Device | undefined = undefined, devName: string | null = null;
     for(let dev of DeviceIds){
         legacyDevice = findByIds(dev.vendorId, dev.productId)!;
         if(legacyDevice) {

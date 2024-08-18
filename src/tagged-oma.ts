@@ -79,7 +79,7 @@ function createEncryptionHeader(titleInfo: TrackMetadata, milliseconds: number) 
 
     let secondGEOBContents = createSonyGEOB("OMG_BKLSI",
         new Uint8Array([0x00, 0x01, 0x00, 0x40, 0x00, 0xDC, 0x00, 0x70, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-    [   
+    [
         { name: 'KEYRING', chunkLen: 0x10, chunks: 0x03, contents: keyringDataB },
         { name: '!CID', chunkLen: 0x10, chunks: 0x02, contents: PHONY_CID },
         { name: 'SHARE_P_SID', chunkLen: 0x10, chunks: 0x01, contents: new Uint8Array([0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0xE3, 0x22, 0xB5, 0x46, 0x89, 0xED, 0x10])},
@@ -135,6 +135,19 @@ export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: TrackMe
     return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, duration: milliseconds };
 }
 
+function findInMetadata(metadata: ID3Tags, id: string, asGeob: boolean) {
+    if(!asGeob) return metadata.tags.find(e => e.id === id);
+    return metadata.tags.filter(e => e.id === "GEOB")
+        .find(e => {
+            if(e.contents[0] !== 0x02) return false;
+            // This is a valid Sony crypto block
+            for(let i = 0; i<id.length * 2; i += 2) {
+                if(e.contents[i + 11] !== id.charCodeAt(i / 2)) return false;
+            }
+            return true;
+        });
+}
+
 export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
     // Read the first 10 bytes to get the encryption header's size.
     const ea3Header = await file.read(10);
@@ -143,22 +156,9 @@ export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
     const fullEncryptionHeader = concatUint8Arrays([ea3Header, await file.read(headerSizeRemaining)]);
     const subsequentData = await file.read();
     const metadata = parse(fullEncryptionHeader);
-    function findInMetadata(id: string, asGeob: boolean) {
-        if(!asGeob) return metadata.tags.find(e => e.id === id);
-        return metadata.tags.filter(e => e.id === "GEOB")
-            .find(e => {
-                if(e.contents[0] !== 0x02) return false;
-                // This is a valid Sony crypto block
-                for(let i = 0; i<id.length * 2; i += 2) {
-                    if(e.contents[i + 11] !== id.charCodeAt(i / 2)) return false;
-                }
-                return true;
-            });
-    }
-
-    const tlen = findInMetadata("TLEN", false);
-    const ulinf = findInMetadata("OMG_ULINF", true);
-    const bklsi = findInMetadata("OMG_BKLSI", true);
+    const tlen = findInMetadata(metadata, "TLEN", false);
+    const ulinf = findInMetadata(metadata, "OMG_ULINF", true);
+    const bklsi = findInMetadata(metadata, "OMG_BKLSI", true);
 
     if(!ulinf || !bklsi || !tlen) throw new Error("Not a valid encrypted OMA");
 

@@ -131,37 +131,36 @@ export function serialize(tags: ID3Tags): Uint8Array{
     return result;
 };
 
-// TODO: Fix this
-export function encodeUTF16BEStringEA3(source: string, includeType = true){
-    const utf8 = textEncoder.encode(source);
+export function encodeUTF16BEStringEA3(source: string, includeType = true) {
     const rawArr: number[] = includeType ? [2] : []; // 2 - marker - UTF16BE
-    let sequenceRemaining = 0;
-    let currentSequence = 0;
-    for(let char of utf8){
-        if(sequenceRemaining) {
-            if((char & (0b10_000000)) !== 0b10_000000) {
-                throw new Error("Internal error");
+
+    for (let i = 0; i < source.length; i++) {
+        let codePoint = source.charCodeAt(i);
+
+        if (codePoint >= 0xD800 && codePoint <= 0xDBFF) {
+            // This is a high surrogate, so we need to get the next character and form the full code point.
+            const highSurrogate = codePoint;
+            const lowSurrogate = source.charCodeAt(++i);
+
+            if (lowSurrogate < 0xDC00 || lowSurrogate > 0xDFFF) {
+                throw new Error("Invalid surrogate pair");
             }
-            currentSequence |= (char & 0b00_111111);
-            --sequenceRemaining;
-            if(!sequenceRemaining) {
-                // Push to rawArr;
-                const high = (currentSequence & 0xFF00) >> 8;
-                const low = currentSequence & 0xFF;
-                rawArr.push(high, low);
-            }
+
+            codePoint = 0x10000 + ((highSurrogate - 0xD800) << 10) + (lowSurrogate - 0xDC00);
+        }
+
+        if (codePoint <= 0xFFFF) {
+            // Encode as two-byte UTF-16BE
+            rawArr.push((codePoint >> 8) & 0xFF, codePoint & 0xFF);
         } else {
-            let i = 0;
-            while((char & (1 << (7 - i)))) i++;
-            if(i){
-                sequenceRemaining = i - 1;
-                currentSequence = char & ((1 << (7 - i)) - 1);
-                currentSequence <<= 6;
-            } else {
-                // Normal
-                rawArr.push(0, char);
-            }
+            // Encode as surrogate pair
+            codePoint -= 0x10000;
+            const highSurrogate = 0xD800 | (codePoint >> 10);
+            const lowSurrogate = 0xDC00 | (codePoint & 0x3FF);
+            rawArr.push((highSurrogate >> 8) & 0xFF, highSurrogate & 0xFF);
+            rawArr.push((lowSurrogate >> 8) & 0xFF, lowSurrogate & 0xFF);
         }
     }
+
     return new Uint8Array(rawArr);
 }

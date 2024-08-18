@@ -11,11 +11,11 @@ For now, it is impossible to use this library as a standalone application - ther
 
 - [x] Track upload (ATRAC3 / ATRAC3+)
 - [x] DRM reimplementation
-- [ ] Fetching contents' list
+- [X] Fetching contents' list
 - [ ] Track upload (MP3)
-- [ ] Track metadata editing (Title / Album / Artist / Genre)
-- [ ] Track moving
-- [ ] Track deletion
+- [X] Track metadata editing (Title / Album / Artist / Genre)
+- [X] Track moving
+- [X] Track deletion
 - [ ] OMA file decryption
 
 ## How to incorporate it into your project?
