@@ -1,38 +1,24 @@
 import fs from 'fs';
-import { arrayEq, concatUint8Arrays } from './utils';
-import { parse, readSynchsafeInt32 } from './id3';
+import { arrayEq, concatUint8Arrays, hexDump as _hexDump, Logger } from '../utils';
+import { parse, readSynchsafeInt32 } from '../id3';
 import { basename } from 'path';
 import { getCodecName, getKBPS } from 'himd-js';
+import { deriveMP3Parameters } from '../derive-mp3-key';
 
-let preffix = "";
-function bumpIndent(i: number) {
-    if(i < 0) {
-        preffix = preffix.substring(0, preffix.length + i * 4);
-    } else {
-        preffix = preffix + " ".repeat(4 * i);
-    }
-}
+const logger = new Logger();
+const log = logger.log.bind(logger);
+const bumpIndent = logger.bumpIndent.bind(logger);
+const hexDump = _hexDump.bind(null, log);
 
-function log(...data: string[]){
-    console.log(preffix + data.join(' '));
-}
 const textDecoder = new TextDecoder();
 
-function hexDump(data: Uint8Array) {
-    if(data.length === 0) log("<None>");
-    for(let row = 0; row < Math.ceil(data.length / 16); row++) {
-        const rowData = data.subarray(row * 16, (row + 1) * 16);
-        log(`${(row * 16).toString(16).padStart(4, '0')}:\t${Array.from(rowData).map(e => e.toString(16).padStart(2, '0')).join(' ')}\t${textDecoder.decode(rowData.map(e => e > 0x20 && e < 0x7F ? e : 46))}`);
-    }
-}
-
 const utf16Decoder = new TextDecoder("UTF-16BE");
-async function parseEncryptionHeader(contents: Uint8Array, offset: number) {
+function parseEncryptionHeader(contents: Uint8Array, offset: number) {
     log("Encryption header (main ID3 header):");
     bumpIndent(1);
     const ea3Header = contents.subarray(offset, offset + 10);
     const headerSizeRemaining = readSynchsafeInt32(new DataView(ea3Header.buffer), 6)[0];
-    const fullEncryptionHeader = concatUint8Arrays([ea3Header, await contents.subarray(offset + 10, offset + 10 + headerSizeRemaining)]);
+    const fullEncryptionHeader = concatUint8Arrays([ea3Header, contents.subarray(offset + 10, offset + 10 + headerSizeRemaining)]);
     const metadata = parse(fullEncryptionHeader);
     log(`Version: ${metadata.version.major}.${metadata.version.minor}`);
     log(`Flags: ${metadata.flags}`);
@@ -119,16 +105,17 @@ async function parseEncryptionHeader(contents: Uint8Array, offset: number) {
     return fullEncryptionHeader.length;
 }
 
-async function parseFormatHeader(contents: Uint8Array, offset: number) {
+function parseFormatHeader(contents: Uint8Array, offset: number) {
     const length = 96;
     log("EA3 format header:");
     bumpIndent(1);
     const data = contents.subarray(offset, offset + length);
     const prologue = data.subarray(0, 6);
     const PROLOGUE_VALID = new Uint8Array([0x45, 0x41, 0x33, 0x01, 0x00, 0x60]);
+    const PROLOGUE_VALID_MP3 = new Uint8Array([0x45, 0x41, 0x33, 0x02, 0x00, 0x60]);
     const epilogue = data.subarray(8, 12);
     const EPILOGUE_VALID = new Uint8Array([0, 0, 0, 0]);
-    if(!arrayEq(EPILOGUE_VALID, epilogue) || !arrayEq(PROLOGUE_VALID, prologue)){
+    if(!arrayEq(EPILOGUE_VALID, epilogue) || !(arrayEq(PROLOGUE_VALID, prologue) || arrayEq(PROLOGUE_VALID_MP3, prologue))){
         log("Invalid data found in EA3 format header. Raw data:");
         bumpIndent(1);
         hexDump(data);
@@ -146,6 +133,16 @@ async function parseFormatHeader(contents: Uint8Array, offset: number) {
     codecInfo[0] = data[33];
     codecInfo[1] = data[34];
     codecInfo[2] = data[35];
+    if(codecId === 3) {
+        // MP3
+        log(`Codec: MP3`);
+        const derivedParams = deriveMP3Parameters(new Uint8Array([codecId, ...codecInfo]));
+        for(const [k, v] of Object.entries(derivedParams)) {
+            log(`${k}: ${v.toString(2)}`);
+        }
+        bumpIndent(-1);
+        return length;
+    }
     const codecInfoStruct = { codecId, codecInfo };
     log(`Codec: ${getCodecName(codecInfoStruct)}`);
     log(`Bitrate: ${getKBPS(codecInfoStruct)}kbps`);
@@ -156,10 +153,10 @@ async function parseFormatHeader(contents: Uint8Array, offset: number) {
 const textEncoder = new TextEncoder();
 const ENCRYPTION_HEADER_START = textEncoder.encode("ea3");
 const FORMAT_HEADER_START = textEncoder.encode("EA3");
-(async () => {
-    const file = process.argv[2];
+export function main(invocation: string, args: string[]) {
+    const file = args[0];
     if(!file) {
-        console.log(`Usage: ${basename(process.argv[1])} <OMA file>`)
+        console.log(`Usage: ${invocation} <OMA file>`)
         return;
     }
     const contents = new Uint8Array(fs.readFileSync(file));
@@ -167,12 +164,12 @@ const FORMAT_HEADER_START = textEncoder.encode("EA3");
     while(offset < contents.length) {
         const headerStart = contents.subarray(offset, offset + 3);
         if(arrayEq(headerStart, ENCRYPTION_HEADER_START)) {
-            offset += await parseEncryptionHeader(contents, offset);
+            offset += parseEncryptionHeader(contents, offset);
         } else if(arrayEq(headerStart, FORMAT_HEADER_START)) {
-            offset += await parseFormatHeader(contents, offset);
+            offset += parseFormatHeader(contents, offset);
         } else {
             console.log("<Audio data>");
             break;
         }
     }
-})().then(_ => process.exit(0));
+}
