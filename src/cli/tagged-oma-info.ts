@@ -1,9 +1,8 @@
 import fs from 'fs';
 import { arrayEq, concatUint8Arrays, hexDump as _hexDump, Logger } from '../utils';
 import { parse, readSynchsafeInt32 } from '../id3';
-import { basename } from 'path';
 import { getCodecName, getKBPS } from 'himd-js';
-import { deriveMP3Parameters } from '../derive-mp3-key';
+import { deriveMP3Parameters } from '../mp3';
 
 const logger = new Logger();
 const log = logger.log.bind(logger);

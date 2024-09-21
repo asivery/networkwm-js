@@ -23,8 +23,8 @@ export function importKeys(rawKeysContents: Uint8Array){
     }
 }
 
-export function getMP3EncryptionKey(discId: Uint8Array, trackNumber: number) {
-    const key = (trackNumber * 0x6953b2ed + 0x6baab1) ^ getUint32(discId, 12);
+export function getMP3EncryptionKey(mp3TrackKey: Uint8Array, trackNumber: number): Uint8Array {
+    const key = getUint32(mp3TrackKey, mp3TrackKey.length - 4) ^ (0x2465 + trackNumber * 0x5296E435);
     return writeUint32(key)
 }
 
@@ -95,13 +95,6 @@ export function createIcvMac(icvAndHeader: Uint8Array, sessionKey: Uint8Array) {
     const zeroWa = Crypto.lib.WordArray.create(new Uint8Array(8).fill(0));
     const result = Crypto.DES.encrypt(icvWa, sessionKeyWa, { mode: Crypto.mode.CBC, iv: zeroWa, padding: NO_PADDING });
     return wordArrayToByteArray(result.ciphertext).subarray(-8);
-}
-
-export function encryptTrackKey(trackKey: Uint8Array) {
-    const trackKeyWa = Crypto.lib.WordArray.create(trackKey);
-    const keyWa = Crypto.lib.WordArray.create(EKBROOTS[0x00010012]);
-    const encrypted = Crypto.TripleDES.encrypt(trackKeyWa, keyWa, { mode: Crypto.mode.ECB, padding: NO_PADDING });
-    return wordArrayToByteArray(encrypted.ciphertext);
 }
 
 export function createTrackMac2(trackKeyWa: Crypto.lib.WordArray, trackEntry: Uint8Array) {

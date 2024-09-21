@@ -2,14 +2,24 @@
 // Sony NW to work.
 
 import { HiMDFilesystem } from "himd-js";
-import { INIT_FILE_CONTENTS } from "./init-data";
+import { InitializationLayer, LAYERS } from "./init-data";
 
+function constructFinalContents(layerNames: (keyof typeof LAYERS)[]) {
+    const currentOverlayed: InitializationLayer = { ...LAYERS.root };
+    for(const layer of layerNames) {
+        for(const [name, value] of Object.entries(LAYERS[layer])) {
+            currentOverlayed[name] = value;
+        }
+    }
+    return currentOverlayed;
+}
 
-export async function initializeNW(filesystem: HiMDFilesystem){
+export async function initializeNW(filesystem: HiMDFilesystem, initLayers: (keyof typeof LAYERS)[]){
     // mkdir the root dir
     await filesystem.mkdir("/OMGAUDIO");
     console.log("Initializing the walkman...");
-    for(let [name, contents] of Object.entries(INIT_FILE_CONTENTS)){
+    const initData = constructFinalContents(initLayers);
+    for(let [name, contents] of Object.entries(initData)){
         console.log(`Initializing ${name}...`)
         const file = await filesystem.open(`/OMGAUDIO/${name}`, 'rw');
         await file.write(contents);
@@ -23,12 +33,11 @@ export async function initializeNW(filesystem: HiMDFilesystem){
     console.log(`Initializing complete!`)
 }
 
-export async function initializeIfNeeded(filesystem: HiMDFilesystem){
+export async function initializeIfNeeded(filesystem: HiMDFilesystem, initLayers: (keyof typeof LAYERS)[]){
     const rootContents = await filesystem.list("/");
     if(!rootContents.find(e => e.type === 'directory' && e.name === '/OMGAUDIO')){
         // This is an uninitialized NW.
-        await initializeNW(filesystem);
+        await initializeNW(filesystem, initLayers);
     }
 }
-
 

@@ -4,7 +4,7 @@ import { TrackMetadata } from "./databases";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA } from "./tagged-oma";
 import { join } from "./utils";
-import { DeviceIds } from "./devices";
+import { DeviceDefinition, DeviceIds } from "./devices";
 import { DatabaseAbstraction } from "./database-abstraction";
 import { initializeIfNeeded } from "./initialization";
 
@@ -47,26 +47,26 @@ export async function uploadTrack(
     session.writeTrackMac(globalTrackIndex - 1, encryptedOMA.maclistValue);
 }
 
-export async function createNWJSFS(webUsbDevice: WebUSBDevice, bypassCoherencyChecks: boolean){
+export async function createNWJSFS(device: { dev: WebUSBDevice, definition: DeviceDefinition }){
     // Connect into the HiMD codebase
-    const fs = new UMSCNWJSFilesystem(webUsbDevice);
+    const fs = new UMSCNWJSFilesystem(device.dev);
 
     await fs.init();
-    await initializeIfNeeded(fs);
+    await initializeIfNeeded(fs, device.definition.databaseParameters?.initLayers ?? []);
     return fs;
 }
 
-export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, name: string } | null> {
-    let legacyDevice: any, devName: string | null = null;
+export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, definition: DeviceDefinition } | null> {
+    let legacyDevice: any, definition: DeviceDefinition | null = null;
     for(let dev of DeviceIds){
         legacyDevice = findByIds(dev.vendorId, dev.productId)!;
         if(legacyDevice) {
-            devName = dev.name;
+            definition = dev;
             break;
         }
     }
     
-    if(!legacyDevice) {
+    if(!legacyDevice || !definition) {
         return null;
     }
 
@@ -82,5 +82,5 @@ export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, name: st
     const webUsbDevice = (await WebUSBDevice.createInstance(legacyDevice))!;
     await webUsbDevice.open();
 
-    return { dev: webUsbDevice, name: devName! };
+    return { dev: webUsbDevice, definition };
 }

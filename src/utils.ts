@@ -86,3 +86,27 @@ export function arrayEq<T>(a: ArrayLike<T>, b: ArrayLike<T>) {
     }
     return true;
 }
+
+const textDecoder = new TextDecoder();
+export function hexDump(logger: (e: string) => void, data: Uint8Array) {
+    if(data.length === 0) logger("<None>");
+    for(let row = 0; row < Math.ceil(data.length / 16); row++) {
+        const rowData = data.subarray(row * 16, (row + 1) * 16);
+        logger(`${(row * 16).toString(16).padStart(4, '0')}:\t${Array.from(rowData).map(e => e.toString(16).padStart(2, '0')).join(' ')}\t${textDecoder.decode(rowData.map(e => e > 0x20 && e < 0x7F ? e : 46))}`);
+    }
+}
+
+export class Logger {
+    preffix = "";
+    bumpIndent(i: number) {
+        if(i < 0) {
+            this.preffix = this.preffix.substring(0, this.preffix.length + i * 4);
+        } else {
+            this.preffix = this.preffix + " ".repeat(4 * i);
+        }
+    }
+    
+    log(...data: string[]){
+        console.log(this.preffix + data.join(' '));
+    }
+}

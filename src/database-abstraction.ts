@@ -5,6 +5,7 @@ import { initializeNW } from "./initialization";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA, updateMetadata } from "./tagged-oma";
 import { resolvePathFromGlobalIndex } from "./helpers";
+import { DeviceDefinition } from "./devices";
 
 export type AbstractedTrack = TrackMetadata & {
     encryptionState: Uint8Array,
@@ -22,12 +23,12 @@ export class DatabaseAbstraction {
     private allTracks: AbstractedTrack[] = [];
     private deletedTracks: number[] = [];
     public database: DatabaseManager;
-    private constructor(private filesystem: HiMDFilesystem) {
+    private constructor(private filesystem: HiMDFilesystem, public deviceInfo: DeviceDefinition) {
         this.database = new DatabaseManager(filesystem);
     }
 
-    public static async create(filesystem: HiMDFilesystem) {
-        const db = new DatabaseAbstraction(filesystem);
+    public static async create(filesystem: HiMDFilesystem, deviceInfo: DeviceDefinition) {
+        const db = new DatabaseAbstraction(filesystem, deviceInfo);
         await db.database.init();
         db._create();
         return db;
@@ -264,7 +265,7 @@ export class DatabaseAbstraction {
             await fs.fatfs!.flushMetadataChanges()
         }
 
-        await initializeNW(fs);
+        await initializeNW(fs, this.deviceInfo.databaseParameters?.initLayers ?? []);
         this.database = new DatabaseManager(this.filesystem);
         await this.database.init();
         this._create();
