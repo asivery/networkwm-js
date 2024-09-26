@@ -1,9 +1,5 @@
 import type { LAYERS } from "./init-data";
 
-export interface ConnectionParameters {
-    msVariant?: number;
-}
-
 export interface DatabaseParameters {
     initLayers: (keyof typeof LAYERS)[],
 }
@@ -12,7 +8,6 @@ export interface DeviceDefinition{
     vendorId: number;
     productId: number;
     name: string;
-    connectionParameters?: ConnectionParameters;
     databaseParameters?: DatabaseParameters;
 }
 
@@ -25,11 +20,16 @@ export const DeviceIds: DeviceDefinition[] = [
         vendorId: 0x054c,
         productId: 0x0358,
         name: 'Sony NW-E026F',
-        connectionParameters: {
-            msVariant: 0x05,
-        },
         databaseParameters: {
             initLayers: [ 'stick_gtrlst' ],
         }
     },
+    {
+        vendorId: 0x054c,
+        productId: 0x03c6,
+        name: 'Sony NW-E043',
+        databaseParameters: {
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    }
 ];

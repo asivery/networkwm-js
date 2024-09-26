@@ -4,9 +4,14 @@ import { getUint32, writeUint16, writeUint32 } from '../bytemanip';
 import { createIcvMac, desDecrypt, EKBROOTS, retailMac } from '../encryption';
 import { WebUSBDevice } from 'usb';
 import { createChunkingDriver, FatFilesystem } from 'nufatfs';
-import { DeviceIds } from '../devices';
+
+const USB_MASS_STORAGE_CLASS = 8;
 
 export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
+    constructor(webUSB: WebUSBDevice){
+        super(webUSB, webUSB.configuration!.interfaces.find(e => e.alternate.interfaceClass === USB_MASS_STORAGE_CLASS)!.alternate.interfaceSubclass);
+    }
+
     protected async drmRead(param: number, length: number) {
         const command = new Uint8Array([
             0xa4,
@@ -204,8 +209,7 @@ export class UMSCNWJSFilesystem extends UMSCHiMDFilesystem {
     driver: SonyVendorNWJSUSMCDriver;
     constructor(webUSB: WebUSBDevice){
         super(webUSB);
-        const deviceDeclaration = DeviceIds.find(e => e.productId === webUSB.productId && e.vendorId === webUSB.vendorId);
-        this.driver = new SonyVendorNWJSUSMCDriver(webUSB, deviceDeclaration?.connectionParameters?.msVariant ?? 0x06);
+        this.driver = new SonyVendorNWJSUSMCDriver(webUSB);
     }
 
     protected async initFS(bypassCoherencyChecks?: boolean | undefined): Promise<void> {
