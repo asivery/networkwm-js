@@ -1,11 +1,14 @@
-import { CodecInfo, HiMDCodecName, HiMDFilesystem, getCodecName, getKBPS } from "himd-js";
-import { DatabaseManager, GroupEntry, TrackMetadata, TreeFile } from "./databases";
+import { CodecInfo, HiMDCodecName, HiMDFilesystem } from "himd-js";
+import { DatabaseManager, GroupEntry, InboundTrackMetadata, TrackMetadata, TreeFile } from "./databases";
 import { complexSort, ComplexSortFormatPart, flatten } from "./sort";
 import { initializeNW } from "./initialization";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA, updateMetadata } from "./tagged-oma";
 import { resolvePathFromGlobalIndex } from "./helpers";
 import { DeviceDefinition } from "./devices";
+import { createMP3OMAFile, generateMP3CodecField } from "./mp3";
+import { NWCodecInfo, getCodecName, getKBPS } from "./codecs";
+import { getUint32, writeUint16 } from "./bytemanip";
 
 export type AbstractedTrack = TrackMetadata & {
     encryptionState: Uint8Array,
@@ -22,15 +25,19 @@ export class DatabaseAbstraction {
     private lastTotalDuration: number = 0;
     private allTracks: AbstractedTrack[] = [];
     private deletedTracks: number[] = [];
+    private mp3DeviceKey?: number;
     public database: DatabaseManager;
     private constructor(private filesystem: HiMDFilesystem, public deviceInfo: DeviceDefinition) {
-        this.database = new DatabaseManager(filesystem);
+        this.database = new DatabaseManager(filesystem, deviceInfo.databaseParameters);
     }
 
     public static async create(filesystem: HiMDFilesystem, deviceInfo: DeviceDefinition) {
         const db = new DatabaseAbstraction(filesystem, deviceInfo);
         await db.database.init();
         db._create();
+        if(filesystem instanceof UMSCNWJSFilesystem) {
+            db.mp3DeviceKey = getUint32((await filesystem.driver.getLeafID()).slice(-4));
+        }
         return db;
     }
 
@@ -68,14 +75,14 @@ export class DatabaseAbstraction {
         });
     }
 
-    public addNewTrack(trackInfo: TrackMetadata, codecInfo: CodecInfo) {
+    public addNewTrack(trackInfo: TrackMetadata, codecInfo: NWCodecInfo, encryptionState: number) {
         const codecName = getCodecName(codecInfo);
         const codecKBPS = getKBPS(codecInfo);
 
         const newObject: AbstractedTrack = {
             ...trackInfo,
             codecInfo: new Uint8Array([codecInfo.codecId, ...codecInfo.codecInfo.subarray(0, 3)]),
-            encryptionState: new Uint8Array([0, 1]),
+            encryptionState: writeUint16(encryptionState),
             oneElementLength: 128,
             systemIndex: -1,
             codecName, codecKBPS
@@ -93,30 +100,19 @@ export class DatabaseAbstraction {
         return newObject.systemIndex;
     }
 
-    async uploadTrack(
-        trackInfo: TrackMetadata,
-        codec: CodecInfo,
-        rawData: Uint8Array,
-        session?: UMSCNWJSSession,
-        callback?: (done: number, outOf: number) => void
-    ) {
+    private reassignTrackNumber(trackInfo: InboundTrackMetadata){
+        let trackNumber = trackInfo.trackNumber!;
         // If trackInfo.trackNumber == -1, it's the next one of this particular album
-        if(trackInfo.trackNumber == -1) {
-            trackInfo.trackNumber = this.allTracks
+        if(trackNumber == -1 || trackNumber === undefined) {
+            trackNumber = this.allTracks
                 .filter(e => e.album === trackInfo.album && e.artist === trackInfo.artist)
                 .reduce((prev, c) => Math.max(prev, c.trackNumber), -1) + 1;
         }
-        // Step 1 - Create the encrypted OMA which will later be written to the device's storage
-        const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
-        // Step 2 - write track to the database
-        const globalTrackIndex = this.addNewTrack({
-            ...trackInfo,
-            trackDuration: encryptedOMA.duration,
-        }, codec);
-    
-        // Step 3 - write track to the filesystem
+        return trackNumber;
+    }
+
+    private async copyToFilesystem(data: Uint8Array, globalTrackIndex: number, callback?: (done: number, outOf: number) => void) {
         const fh = await this.database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
-        const data = encryptedOMA.data;
         let remaining = data.length;
         let i = 0;
         callback?.(i, data.length);
@@ -128,6 +124,45 @@ export class DatabaseAbstraction {
             callback?.(i, data.length);
         }
         await fh.close();
+    }
+
+    async uploadMP3Track(
+        trackInfo: InboundTrackMetadata,
+        rawData: Uint8Array,
+        callback?: (done: number, outOf: number) => void
+    ) {
+        if(this.mp3DeviceKey === undefined) throw new Error("Please load the device key first!");
+        const { codec, duration } = generateMP3CodecField(rawData)
+
+        const trackNumber = trackInfo.trackNumber = this.reassignTrackNumber(trackInfo);
+        const globalTrackIndex = this.addNewTrack({
+            ...trackInfo,
+            trackDuration: duration,
+            trackNumber,
+        }, codec, 0xFFFE);
+        const mp3Data = createMP3OMAFile(globalTrackIndex, trackInfo, rawData, this.mp3DeviceKey, codec);
+        await this.copyToFilesystem(mp3Data, globalTrackIndex, callback);
+    }
+
+    async uploadTrack(
+        trackInfo: InboundTrackMetadata,
+        codec: CodecInfo,
+        rawData: Uint8Array,
+        session?: UMSCNWJSSession,
+        callback?: (done: number, outOf: number) => void
+    ) {
+        const trackNumber = this.reassignTrackNumber(trackInfo);
+        // Step 1 - Create the encrypted OMA which will later be written to the device's storage
+        const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
+        // Step 2 - write track to the database
+        const globalTrackIndex = this.addNewTrack({
+            ...trackInfo,
+            trackDuration: encryptedOMA.duration,
+            trackNumber,
+        }, codec, 0x0001);
+    
+        // Step 3 - write track to the filesystem
+        await this.copyToFilesystem(encryptedOMA.data, globalTrackIndex, callback);
 
         // Step 4 - write MAC
         session?.writeTrackMac(globalTrackIndex - 1, encryptedOMA.maclistValue);

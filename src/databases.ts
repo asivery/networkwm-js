@@ -1,10 +1,11 @@
 import { getBEUint32, getBEUint32AsBytes } from "node-mass-storage";
-import { CodecInfo, HiMDFilesystem, getKBPS, getCodecName, HiMDCodecName } from "himd-js";
+import { HiMDFilesystem, getKBPS, getCodecName, HiMDCodecName } from "himd-js";
 
 import { getUint16, readBytes, readUint16, readUint32, writeUint16, writeUint32 } from "./bytemanip";
 import { encodeUTF16BEStringEA3 } from "./id3";
 import { parseTable, TableFile, serializeTable } from "./tables";
 import { assert } from "./utils";
+import { DatabaseParameters } from "./devices";
 
 const FILES_TO_LOAD = [
     // Group definition files:
@@ -67,13 +68,14 @@ export interface TreeFile {mapStartBounds: { firstTrackApplicableInTPLB: number,
 export interface ContentEntry { encryptionState: Uint8Array, codecInfo: Uint8Array, trackDuration: number, oneElementLength: number, contents: {[key: string]: string}}
 export interface GroupEntry {totalDuration: number, oneElementLength: number, contents: {[key: string]: string}};
 export interface TrackMetadata {album: string, artist: string, title: string, genre: string, trackDuration: number, trackNumber: number}
+export interface InboundTrackMetadata {album: string, artist: string, title: string, genre: string, trackNumber?: number }
 export class DatabaseManager {
     tableFiles: {[fileName: string]: TableFile} = {}
     parsedTreeFiles: {[fileName: string]: TreeFile} = {};
     parsedGroupInfoFiles: {[fileName: string]: GroupEntry[]} = {};
     globalContentInfoFile: ContentEntry[] = [];
 
-    constructor(public filesystem: HiMDFilesystem) {}
+    constructor(public filesystem: HiMDFilesystem, private databaseParameters?: DatabaseParameters) {}
 
     async init(){
         for(let file of FILES_TO_LOAD) {

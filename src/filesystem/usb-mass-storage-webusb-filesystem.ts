@@ -62,6 +62,10 @@ export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
         await this.sendCommandOutGetResult(command, newData, command.length);
     }
 
+    async getLeafID(): Promise<Uint8Array> {
+        return (await this.drmRead(0x3f, 0x12)).slice(0, -2);
+    }
+
     async writeHostLeafID(leafID: Uint8Array, hostNonce: Uint8Array) {
         assert(leafID.length === 8, 'Wrong length of leaf id');
         const finalBuffer = new Uint8Array(2 + 8 + 8);

@@ -5,6 +5,7 @@ export interface TableClassDefinition {
     className: string;
     startAddress: number;
     classLength: number;
+    _overrideMinimalClassLength?: number;
 }
 
 export interface TableClassContents {
@@ -73,6 +74,9 @@ export function serializeTable(tableFile: TableFile, writeSecondLength = true): 
         let contentLength = tableFile.contents[i].elements.length * tableFile.contents[i].oneElementLength + 0x10; // 0x10 for the content header.
         if(contentLength % 16 !== 0){
             contentLength += 16 - (contentLength % 16);
+        }
+        if(tableFile.classes[i]._overrideMinimalClassLength) {
+            contentLength = Math.max(contentLength, tableFile.classes[i]._overrideMinimalClassLength!);
         }
         if(tableFile.classes[i].classLength < contentLength){
             let difference = contentLength - tableFile.classes[i].classLength;

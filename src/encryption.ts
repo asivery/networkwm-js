@@ -23,9 +23,8 @@ export function importKeys(rawKeysContents: Uint8Array){
     }
 }
 
-export function getMP3EncryptionKey(mp3TrackKey: Uint8Array, trackNumber: number): Uint8Array {
-    const key = getUint32(mp3TrackKey, mp3TrackKey.length - 4) ^ (0x2465 + trackNumber * 0x5296E435);
-    return writeUint32(key)
+export function getMP3EncryptionKey(discId: number, trackNumber: number) {
+    return (trackNumber * 0x5296E435 + 0x2465) ^ discId;
 }
 
 export function createTrackKeyForKeyring(ekbNum: number, verificationKey: Uint8Array, trackKey: Uint8Array) {

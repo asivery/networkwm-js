@@ -1,4 +1,6 @@
 import { readBytes, readUint16, readUint32, readUint8, writeUint8, writeUint16, writeUint32 } from './bytemanip';
+import { InboundTrackMetadata, TrackMetadata } from './databases';
+import { concatUint8Arrays } from './utils';
 
 export interface ID3Tag {
     id: string,
@@ -163,4 +165,26 @@ export function encodeUTF16BEStringEA3(source: string, includeType = true) {
     }
 
     return new Uint8Array(rawArr);
+}
+
+export function encodeSonyWeirdString(type: string, data: string){
+    return concatUint8Arrays([
+        encodeUTF16BEStringEA3(type),
+        new Uint8Array([0, 0]),
+        encodeUTF16BEStringEA3(data, false),
+    ]);
+}
+
+export function createCommonID3Tags(titleInfo: InboundTrackMetadata) {
+    return [
+        {id: "TIT2", contents: encodeUTF16BEStringEA3(titleInfo.title), flags: 0},
+        {id: "TPE1", contents: encodeUTF16BEStringEA3(titleInfo.artist), flags: 0},
+        {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
+        {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
+        {id: "TCON", contents: encodeUTF16BEStringEA3(titleInfo.genre), flags: 0},
+        {id: "TXXX", contents: encodeSonyWeirdString("OMG_TPE1S", titleInfo.artist), flags: 0},
+        {id: "TXXX", contents: encodeSonyWeirdString("OMG_TRACK", '0'), flags: 0},
+        {id: "TXXX", contents: encodeSonyWeirdString("OMG_ALBMS", titleInfo.album), flags: 0},
+        {id: "TXXX", contents: encodeSonyWeirdString("OMG_TIT2S", titleInfo.title), flags: 0},
+    ]
 }

@@ -17,10 +17,12 @@ export function readUint32(data: DataView, offset: number): [number, number]{
 };
 
 export function getUint32(data: Uint8Array, offset: number = 0) {
+    if(offset < 0) offset += data.length;
     return (data[offset + 0] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
 }
 
 export function getUint16(data: Uint8Array, offset: number = 0) {
+    if(offset < 0) offset += data.length;
     return (data[offset + 0] << 8) | data[offset + 1];
 }
 

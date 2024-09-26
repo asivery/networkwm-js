@@ -2,7 +2,9 @@ import fs from 'fs';
 import { arrayEq, concatUint8Arrays, hexDump as _hexDump, Logger } from '../utils';
 import { parse, readSynchsafeInt32 } from '../id3';
 import { getCodecName, getKBPS } from 'himd-js';
-import { deriveMP3Parameters } from '../mp3';
+import { deriveMP3ParametersFromOMA } from '../derive-mp3-key';
+
+let hexDumpAll = false;
 
 const logger = new Logger();
 const log = logger.log.bind(logger);
@@ -98,6 +100,11 @@ function parseEncryptionHeader(contents: Uint8Array, offset: number) {
                     log(`${tag.id}: ${stringValue} <${tag.flags}>`);
                 }
             } else log(`${tag.id}: <Unknown data> <${tag.flags}>`);
+            if(hexDumpAll) {
+                bumpIndent(1);
+                hexDump(tag.contents);
+                bumpIndent(-1);
+            }
         }
     }
     bumpIndent(-2);
@@ -135,7 +142,7 @@ function parseFormatHeader(contents: Uint8Array, offset: number) {
     if(codecId === 3) {
         // MP3
         log(`Codec: MP3`);
-        const derivedParams = deriveMP3Parameters(new Uint8Array([codecId, ...codecInfo]));
+        const derivedParams = deriveMP3ParametersFromOMA(new Uint8Array([codecId, ...codecInfo]));
         for(const [k, v] of Object.entries(derivedParams)) {
             log(`${k}: ${v.toString(2)}`);
         }
@@ -155,11 +162,12 @@ const FORMAT_HEADER_START = textEncoder.encode("EA3");
 export function main(invocation: string, args: string[]) {
     const file = args[0];
     if(!file) {
-        console.log(`Usage: ${invocation} <OMA file>`)
+        console.log(`Usage: ${invocation} <OMA file> [hex-dump-all]`)
         return;
     }
     const contents = new Uint8Array(fs.readFileSync(file));
     let offset = 0;
+    if(args[1] === 'hex-dump-all') hexDumpAll = true;
     while(offset < contents.length) {
         const headerStart = contents.subarray(offset, offset + 3);
         if(arrayEq(headerStart, ENCRYPTION_HEADER_START)) {

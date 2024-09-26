@@ -1,4 +1,6 @@
 import { CodecInfo } from 'himd-js';
+import { TrackMetadata } from './databases';
+import { encodeSonyWeirdString, encodeUTF16BEStringEA3 } from './id3';
 
 export function assert(condition: boolean, message?: string) {
     if (condition) {
@@ -26,17 +28,6 @@ export function concatUint8Arrays(args: Uint8Array[]) {
         offset += a.length;
     }
     return res;
-}
-
-export function createEA3Header({ codecId, codecInfo }: CodecInfo, encrypted = false) {
-    const headerSize = 96;
-    const header = new Uint8Array(headerSize);
-    header.set(new Uint8Array([0x45, 0x41, 0x33, 0x01, 0x00, 0x60, encrypted ? 0x00 : 0xff, encrypted ? 0x01 : 0xff, 0x00, 0x00, 0x00, 0x00]));
-    header[32] = codecId;
-    header[33] = codecInfo[0];
-    header[34] = codecInfo[1];
-    header[35] = codecInfo[2];
-    return header;
 }
 
 function wordToByteArray(word: number, length: number, littleEndian = false) {
@@ -88,12 +79,19 @@ export function arrayEq<T>(a: ArrayLike<T>, b: ArrayLike<T>) {
 }
 
 const textDecoder = new TextDecoder();
-export function hexDump(logger: (e: string) => void, data: Uint8Array) {
+export function hexDump(logger: (e: string) => void, data: Uint8Array, truncate = true) {
     if(data.length === 0) logger("<None>");
-    for(let row = 0; row < Math.ceil(data.length / 16); row++) {
+    let rows = Math.ceil(data.length / 16),
+        truncated = false;
+    if(truncate && rows > 20) {
+        rows = 20;
+        truncated = true;
+    }
+    for(let row = 0; row < rows; row++) {
         const rowData = data.subarray(row * 16, (row + 1) * 16);
         logger(`${(row * 16).toString(16).padStart(4, '0')}:\t${Array.from(rowData).map(e => e.toString(16).padStart(2, '0')).join(' ')}\t${textDecoder.decode(rowData.map(e => e > 0x20 && e < 0x7F ? e : 46))}`);
     }
+    if(truncated) logger("<truncated>");
 }
 
 export class Logger {
