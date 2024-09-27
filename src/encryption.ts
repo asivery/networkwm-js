@@ -1,5 +1,5 @@
 import Crypto from '@originjs/crypto-js-wasm';
-import { getUint32, readUint32, writeUint32 } from './bytemanip';
+import { readUint32 } from './bytemanip';
 import { NWJSError } from './errors';
 import { wordArrayToByteArray } from './utils';
 
@@ -29,7 +29,7 @@ export function getMP3EncryptionKey(discId: number, trackNumber: number) {
 
 export function createTrackKeyForKeyring(ekbNum: number, verificationKey: Uint8Array, trackKey: Uint8Array) {
     if (!(ekbNum in EKBROOTS)) {
-        throw new NWJSError('Requested decription with an unknown EKB');
+        throw new NWJSError('Requested decryption with an unknown EKB');
     }
     const rootKeyC = Crypto.lib.WordArray.create(EKBROOTS[ekbNum]);
     const verificationKeyC = Crypto.lib.CipherParams.create({
@@ -51,9 +51,33 @@ export function createTrackKeyForKeyring(ekbNum: number, verificationKey: Uint8A
     return wordArrayToByteArray(decryptedTrackKey, 8);
 }
 
+export function createTrackKeyFromKeyring(ekbNum: number, encryptedVerificationKey: Uint8Array, encryptedTrackKey: Uint8Array) {
+    if (!(ekbNum in EKBROOTS)) {
+        throw new NWJSError('Requested decryption with an unknown EKB');
+    }
+    const rootKeyC = Crypto.lib.WordArray.create(EKBROOTS[ekbNum]);
+    const verificationKeyC = Crypto.lib.CipherParams.create({
+        ciphertext: Crypto.lib.WordArray.create(encryptedVerificationKey),
+    });
+    const trackKeyC = Crypto.lib.WordArray.create(encryptedTrackKey);
+
+    // Step 1: get real verification key
+    const verificationKey = Crypto.TripleDES.decrypt(verificationKeyC, rootKeyC, {
+        mode: Crypto.mode.ECB,
+    });
+
+    // Step 2: get decrypted track key - so encrypt it
+    const decryptedTrackKey = Crypto.TripleDES.encrypt(trackKeyC, verificationKey, {
+        mode: Crypto.mode.ECB,
+        padding: NO_PADDING
+    }).ciphertext;
+
+    return wordArrayToByteArray(decryptedTrackKey, 8);
+}
+
 export function createMaclistValue(ekbNum: number, verificationKey: Uint8Array, contents: Uint8Array) {
     if (!(ekbNum in EKBROOTS)) {
-        throw new NWJSError('Requested decription with an unknown EKB');
+        throw new NWJSError('Requested decryption with an unknown EKB');
     }
     const rootKeyC = Crypto.lib.WordArray.create(EKBROOTS[ekbNum]);
     const verificationKeyC = Crypto.lib.CipherParams.create({
