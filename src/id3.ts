@@ -183,7 +183,7 @@ export function createCommonID3Tags(titleInfo: InboundTrackMetadata) {
         {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
         {id: "TCON", contents: encodeUTF16BEStringEA3(titleInfo.genre), flags: 0},
         {id: "TXXX", contents: encodeSonyWeirdString("OMG_TPE1S", titleInfo.artist), flags: 0},
-        {id: "TXXX", contents: encodeSonyWeirdString("OMG_TRACK", '0'), flags: 0},
+        {id: "TXXX", contents: encodeSonyWeirdString("OMG_TRACK", (titleInfo.trackNumber ?? 0) + ''), flags: 0},
         {id: "TXXX", contents: encodeSonyWeirdString("OMG_ALBMS", titleInfo.album), flags: 0},
         {id: "TXXX", contents: encodeSonyWeirdString("OMG_TIT2S", titleInfo.title), flags: 0},
     ]

@@ -96,15 +96,7 @@ function createEncryptionHeader(titleInfo: InboundTrackMetadata, milliseconds: n
         version: {major: 3, minor: 0},
         tags: [
             {id: "GEOB", contents: firstGEOBContents, flags: 0}, // OMG_ULINF
-            {id: "TIT2", contents: encodeUTF16BEStringEA3(titleInfo.title), flags: 0},
-            {id: "TPE1", contents: encodeUTF16BEStringEA3(titleInfo.artist), flags: 0},
-            {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
-            {id: "TALB", contents: encodeUTF16BEStringEA3(titleInfo.album), flags: 0},
-            {id: "TCON", contents: encodeUTF16BEStringEA3(titleInfo.genre), flags: 0},
-            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TPE1S", titleInfo.artist), flags: 0},
-            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TRACK", '0'), flags: 0}, //???
-            {id: "TXXX", contents: encodeSonyWeirdString("OMG_ALBMS", titleInfo.album), flags: 0},
-            {id: "TXXX", contents: encodeSonyWeirdString("OMG_TIT2S", titleInfo.title), flags: 0},
+            ...createCommonID3Tags(titleInfo),
             {id: "TLEN", contents: encodeUTF16BEStringEA3(milliseconds.toString()), flags: 0},
             {id: "GEOB", contents: secondGEOBContents, flags: 0}, // OMG_BKLSI
         ]

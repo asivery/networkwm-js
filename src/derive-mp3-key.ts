@@ -24,7 +24,7 @@ export function deriveMP3ParametersFromOMA(mp3CodecInfo: Uint8Array) {
     return { version, layer, bitrate, sample, chmod, preemp, flags };
 }
 
-export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFrames' | 'genKeys' | 'commonness', progress: number) => void): number {
+export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFrames' | 'genKeys' | 'commonness', progress: number, outOf: number) => void): number {
     // Make sure we're dealing with an MP3 OMA file
     let offset = 0;
     let headerStart = rawFile.subarray(offset, offset + 3);
@@ -37,6 +37,7 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
     const rawDataView = new DataView(rawFile.buffer);
     if(!arrayEq(headerStart, FORMAT_HEADER_START)) throw new Error("Expected format header");
     const mp3CodecInfo = rawFile.subarray(offset + 32, offset + 32 + 5);
+    if(rawFile[offset + 6] !== 0xFF || rawFile[offset + 7] !== 0xFE) throw new Error("OMA is not LeafID-XOR encoded!");
     const { version, layer, bitrate, sample, chmod, preemp } = deriveMP3ParametersFromOMA(mp3CodecInfo);
     const audioStartOffset = offset + 96;
     const fourByteChunks = [];
@@ -65,9 +66,9 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
     const firstXoredHeader = fourByteChunks[0];
 
     const allFirstFrames = Array(128).fill(0).map((_, i) => getUint32(formHeader(i)));
-    callback?.('genFrames', -1);
+    callback?.('genFrames', -1, -1);
     const allKeys = allFirstFrames.map(r => firstXoredHeader ^ r);
-    callback?.('genKeys', -1);
+    callback?.('genKeys', -1, -1);
     const commonness = [];
     
     for(let keyI = 0; keyI < allKeys.length; keyI++) {
@@ -78,7 +79,7 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
             if(chunk === key) ++z;
         }
         commonness.push(z);
-        callback?.('commonness', keyI);
+        callback?.('commonness', keyI, allKeys.length);
     }
     // Find the most common key
     const matchedKey = allKeys[commonness.indexOf(Math.max(...commonness))];
