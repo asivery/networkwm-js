@@ -33,3 +33,7 @@ export const DeviceIds: DeviceDefinition[] = [
         }
     }
 ];
+
+export function findDevice(vid: number, pid: number): DeviceDefinition | null {
+    return DeviceIds.find(e => e.vendorId === vid && e.productId === pid) ?? null;
+}

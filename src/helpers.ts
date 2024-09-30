@@ -26,7 +26,7 @@ export async function openNewDeviceNode(): Promise<{ dev: WebUSBDevice, definiti
             break;
         }
     }
-    
+
     if(!legacyDevice || !definition) {
         return null;
     }

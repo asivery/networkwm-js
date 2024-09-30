@@ -29,10 +29,12 @@ export function getCodecName(codecInfo: NWCodecInfo) {
 }
 
 export function getKBPS(codecInfo: NWCodecInfo) {
-    // FIXME: MP3 KBPS retrieval broken
     if(codecInfo.codecId === NWCodec.MP3) {
-        const modifiedCodecInfo = new Uint8Array(codecInfo.codecInfo);
-        modifiedCodecInfo[0] |= 0b11;
+        // Make it compatible with HiMD codec definitions
+        const modifiedCodecInfo = new Uint8Array(5);
+        modifiedCodecInfo.fill(0);
+        modifiedCodecInfo[0] = 3;
+        modifiedCodecInfo.set(codecInfo.codecInfo, 2);
         return _getKBPS({
             codecInfo: modifiedCodecInfo,
             codecId: HiMDCodec.ATRAC3PLUS_OR_MPEG,
