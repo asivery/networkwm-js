@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { main as tableMain } from './cli/table-file-info';
 import { main as omaMain } from './cli/tagged-oma-info';
+import { main as omaDecryptMain } from './cli/decrypt-oma';
+import { mainDeriveKey as mp3DeriveKeyMain } from './cli/decrypt-mp3';
+import { main as mp3DecryptMain } from './cli/decrypt-mp3';
+
 import { basename } from 'path';
 
 interface CliCommand {
@@ -16,7 +20,19 @@ const commands: CliCommand[] = [
     {
         name: 'oma-info',
         root: omaMain,
-    }
+    },
+    {
+        name: 'decrypt-oma',
+        root: omaDecryptMain,
+    },
+    {
+        name: 'derive-mp3-key',
+        root: mp3DeriveKeyMain,
+    },
+    {
+        name: 'decrypt-mp3',
+        root: mp3DecryptMain,
+    },
 ];
 
 async function main(){
