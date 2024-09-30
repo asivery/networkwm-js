@@ -10,6 +10,8 @@ import { createMP3OMAFile, generateMP3CodecField } from "./mp3";
 import { NWCodecInfo, getCodecName, getKBPS } from "./codecs";
 import { getUint32, writeUint16 } from "./bytemanip";
 
+const DEVICE_ID_CACHE_FILE = "/OMGAUDIO/DevID.DAT";
+
 export type AbstractedTrack = TrackMetadata & {
     encryptionState: Uint8Array,
     codecInfo: Uint8Array,
@@ -35,8 +37,29 @@ export class DatabaseAbstraction {
         const db = new DatabaseAbstraction(filesystem, deviceInfo);
         await db.database.init();
         db._create();
+        // Get the MP3 device key (device ID)
+        let deviceId = null;
         if(filesystem instanceof UMSCNWJSFilesystem) {
-            db.mp3DeviceKey = getUint32((await filesystem.driver.getLeafID()).slice(-4));
+            deviceId = await filesystem.driver.getDiscID();
+            // Cache, if this file doesn't exist already
+            if((await filesystem.getSize(DEVICE_ID_CACHE_FILE)) === null) {
+                // Not cached. Create it.
+                const handle = await filesystem.open(DEVICE_ID_CACHE_FILE, 'rw');
+                await handle.write(deviceId);
+                await handle.close();
+            }
+        } else {
+            // Cannot retrieve directly.
+            // Check if there is a cache file.
+            const rawDeviceIDFile = await filesystem.open(DEVICE_ID_CACHE_FILE, 'ro');
+            if(rawDeviceIDFile) {
+                // Yes, it's been cached.
+                deviceId = await rawDeviceIDFile.read();
+                await rawDeviceIDFile.close();
+            }
+        }
+        if(deviceId) {
+            db.mp3DeviceKey = getUint32(deviceId.slice(-4));
         }
         return db;
     }
@@ -314,8 +337,9 @@ export class DatabaseAbstraction {
         // TODO: Is this necessary??
         // Update the metadata within the OMA file
         const handle = await this.database.filesystem.open(resolvePathFromGlobalIndex(systemIndex), 'rw');
-        if(!handle) return;
-        await updateMetadata(handle, metadata);
+        if(handle) {
+            await updateMetadata(handle, metadata);
+        }
     }
 }
 
