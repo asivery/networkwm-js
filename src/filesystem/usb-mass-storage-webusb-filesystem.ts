@@ -62,7 +62,7 @@ export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
         await this.sendCommandOutGetResult(command, newData, command.length);
     }
 
-    async getLeafID(): Promise<Uint8Array> {
+    async getDiscID(): Promise<Uint8Array> {
         return (await this.drmRead(0x3f, 0x12)).slice(0, -2);
     }
 
