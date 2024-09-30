@@ -42,7 +42,7 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
     const audioStartOffset = offset + 96;
     const fourByteChunks = [];
     for(let i = audioStartOffset; i < rawFile.length - 3; i += 4){
-        fourByteChunks.push(rawDataView.getUint32(i));
+        fourByteChunks.push(rawDataView.getUint32(i) >>> 0);
     }
 
     function formHeader(variantIteration: number){
@@ -67,10 +67,10 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
 
     const allFirstFrames = Array(128).fill(0).map((_, i) => getUint32(formHeader(i)));
     callback?.('genFrames', -1, -1);
-    const allKeys = allFirstFrames.map(r => firstXoredHeader ^ r);
+    const allKeys = allFirstFrames.map(r => (firstXoredHeader ^ r) >>> 0);
     callback?.('genKeys', -1, -1);
     const commonness = [];
-    
+
     for(let keyI = 0; keyI < allKeys.length; keyI++) {
         const key = allKeys[keyI];
         // Zero should be dominant in the MP3 file => The most common key present as plaintext in the file will be valid
@@ -88,7 +88,7 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
 }
 
 export function decryptMP3(fullFile: Uint8Array, fileId: number, deviceKey?: number, callback?: (state: 'genFrames' | 'genKeys' | 'commonness' | 'decrypt', progress: number, of: number) => void){
-    const trackKey = deviceKey ? getMP3EncryptionKey(deviceKey, fileId) : deriveMP3TrackKey(fullFile, callback ? (s, p) => callback(s, p, 127) : undefined);
+    const trackKey = (deviceKey ? getMP3EncryptionKey(deviceKey, fileId) : deriveMP3TrackKey(fullFile, callback ? (s, p) => callback(s, p, 127) : undefined)) >>> 0;
 
     // Make sure we're dealing with an MP3 OMA file
     let offset = 0;
@@ -106,8 +106,8 @@ export function decryptMP3(fullFile: Uint8Array, fileId: number, deviceKey?: num
     for(offset; offset < data.length - 7; offset += 8){
         // 8-byte-long block processing on 4-byte-long key
         // Ok Sony.
-        dataView.setUint32(offset, dataView.getUint32(offset) ^ trackKey);
-        dataView.setUint32(offset + 4, dataView.getUint32(offset + 4) ^ trackKey);
+        dataView.setUint32(offset, (dataView.getUint32(offset) ^ trackKey) >>> 0);
+        dataView.setUint32(offset + 4, (dataView.getUint32(offset + 4) ^ trackKey) >>> 0);
         callback?.('decrypt', offset, data.length);
     }
 
