@@ -1,5 +1,7 @@
+#!/usr/bin/env node
 import { main as tableMain } from './cli/table-file-info';
 import { main as omaMain } from './cli/tagged-oma-info';
+import { basename } from 'path';
 
 interface CliCommand {
     name: string;
@@ -22,7 +24,7 @@ async function main(){
     const args = process.argv.slice(3);
     const def: CliCommand | undefined = commands.find(e => e.name.toLowerCase() === subcommand);
     if(!def) {
-        console.log(`Usage ${process.argv[1]} <subcommand> [...arguments], where subcommand is one of:`);
+        console.log(`Usage ${basename(process.argv[1])} <subcommand> [...arguments], where subcommand is one of:`);
         commands.forEach(e => console.log(`- ${e.name}`));
         return;
     }
