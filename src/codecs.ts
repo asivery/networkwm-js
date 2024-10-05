@@ -34,7 +34,7 @@ export function getKBPS(codecInfo: NWCodecInfo) {
         const modifiedCodecInfo = new Uint8Array(5);
         modifiedCodecInfo.fill(0);
         modifiedCodecInfo[0] = 3;
-        modifiedCodecInfo.set(codecInfo.codecInfo, 2);
+        modifiedCodecInfo.set(codecInfo.codecInfo.subarray(0, 3), 2);
         return _getKBPS({
             codecInfo: modifiedCodecInfo,
             codecId: HiMDCodec.ATRAC3PLUS_OR_MPEG,
