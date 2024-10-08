@@ -4,6 +4,7 @@ import { main as omaMain } from './cli/tagged-oma-info';
 import { main as omaDecryptMain } from './cli/decrypt-oma';
 import { mainDeriveKey as mp3DeriveKeyMain } from './cli/decrypt-mp3';
 import { main as mp3DecryptMain } from './cli/decrypt-mp3';
+import { main as signDeviceMain } from './cli/sign-device';
 
 import { basename } from 'path';
 
@@ -33,6 +34,10 @@ const commands: CliCommand[] = [
         name: 'decrypt-mp3',
         root: mp3DecryptMain,
     },
+    {
+        name: 'sign-device',
+        root: signDeviceMain,
+    }
 ];
 
 async function main(){
