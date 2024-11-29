@@ -135,6 +135,13 @@ export class DatabaseAbstraction {
     }
 
     private async copyToFilesystem(data: Uint8Array, globalTrackIndex: number, callback?: (done: number, outOf: number) => void) {
+        // Make sure the audio store directory appropriate for this file exists
+        const audioStore = `/OMGAUDIO/10F${(globalTrackIndex >> 8).toString(16).padStart(2, '0')}`;
+        if(!(await this.filesystem.list("/OMGAUDIO")).some(e => e.name === audioStore)) {
+            // The audio store for this file doesn't yet exist - create it.
+            await this.filesystem.mkdir(audioStore);
+        }
+
         const fh = await this.database.filesystem.open(resolvePathFromGlobalIndex(globalTrackIndex), 'rw');
         let remaining = data.length;
         let i = 0;
@@ -229,12 +236,12 @@ export class DatabaseAbstraction {
                     PICP: '',
                     PIC0: '',
                 }),
-                sorting: [[{ var: 'artist' }, { literal: '-----'}, { var: 'album' }], [{ var: 'trackNumber'}]],
+                sorting: [[{ var: 'artist' }, { literal: '-----' }, { var: 'album' }], [{ var: 'trackNumber' }]],
             },
             // TREE02 - [artist] > [title]
             {
                 metadataCreator: e => ({ TIT2: e.artist }),
-                sorting: [[{ var: 'artist' }], [{ var: 'title'}]],
+                sorting: [[{ var: 'artist' }], [{ var: 'title' }]],
             },
             // TREE03 - [album] > [trackNumber]
             {

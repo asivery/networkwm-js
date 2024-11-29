@@ -38,7 +38,47 @@ export const DeviceIds: DeviceDefinition[] = [
         databaseParameters: {
             initLayers: [ 'stick_gtrlst' ],
         }
-    }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x02E4,
+        name: 'Sony NW-S203F',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x01FB,
+        name: 'Sony NW-E305',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x027c,
+        name: 'Sony NW-A608',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x082e,
+        name: 'Sony NWZ-W273S',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x0358,
+        name: 'Sony NW-E026f',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
 ];
 
 export function findDevice(vid: number, pid: number): DeviceDefinition | null {
