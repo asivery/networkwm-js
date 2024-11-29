@@ -292,7 +292,7 @@ export class DatabaseManager {
             if(gplbEntry !== -1){
                 groupedEncountered.push(track);
                 if(groups.length < gplbEntry) {
-                    groups.push({ groupName: desc[gplbEntry - 1].contents['TIT2'], contents: []});
+                    groups.push({ groupName: desc[gplbEntry - 1].contents['TIT2'], contents: [] });
                 }
                 groups[gplbEntry - 1].contents.push(this.getGlobalTrack(track));
             }
@@ -307,7 +307,7 @@ export class DatabaseManager {
 
     public listContentArtists(): {[artist: string]: {[album: string]: {track: string, index: -1, duration: number, codecName: HiMDCodecName, codecKBPS: number }[]}} {
         const artists: {[artist: string]: {[album: string]: {track: string, index: -1, duration: number, codecName: HiMDCodecName, codecKBPS: number}[]}} = {};
-        
+
         for(let i = 1; i<=this.globalContentInfoFile.length; i++) {
             const track = this.getGlobalTrack(i);
             if(!(track.artist in artists)) {
@@ -326,7 +326,7 @@ export class DatabaseManager {
                 codecKBPS: track.codecKBPS,
             });
         }
-        
+
         return artists;
     }
 }
