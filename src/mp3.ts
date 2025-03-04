@@ -2,8 +2,9 @@ import { readTags, readFrame, FrameHeader, Header } from 'mp3-parser';
 import { writeUint32 } from './bytemanip';
 import { createEA3Header, NWCodec, NWCodecInfo } from './codecs';
 import { InboundTrackMetadata, TrackMetadata } from './databases';
-import { readSynchsafeInt32, serialize, createCommonID3Tags, encodeSonyWeirdString } from './id3';
+import { readSynchsafeInt32, serialize, createCommonID3Tags, encodeSonyWeirdString, readInitialID3Header } from './id3';
 import { getMP3EncryptionKey } from './encryption';
+import { HiMDFile } from 'himd-js';
 
 const HIMD_MP3_VAR_VERSION = 0x40;
 const HIMD_MP3_VAR_LAYER = 0x20;
@@ -108,6 +109,8 @@ export function generateMP3CodecField(mp3Data: Uint8Array): { codec: NWCodecInfo
     };
 }
 
+const METADATA_BLOCK_SIZE = 0x1000;
+
 export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, rawFile: Uint8Array, deviceKey: number, codec: NWCodecInfo): Uint8Array {
     // Strip all ID3 tags from the source MP3 file
     let cursor = 0;
@@ -120,6 +123,7 @@ export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, 
     }
     // Cursor points to the start of the first MP3 frame in this file.
     // Create the new and compliant ID3 tag set from metadata
+    // Reserve METADATA_BLOCK_SIZE bytes for metadata edits down the line
     const rootID3 = serialize({
         version: { major: 3, minor: 0 },
         flags: 0,
@@ -129,7 +133,7 @@ export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, 
             { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_FCRCA1", " ")},
             { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_TRLDA", "1982/01/01 00:00:00")},
         ],
-    });
+    }, METADATA_BLOCK_SIZE);
     const formatHeader = createEA3Header(codec, 0xFFFE, 2);
 
     const finalFileBuffer = new Uint8Array(rootID3.length + formatHeader.length + rawFile.length - cursor);
@@ -144,4 +148,25 @@ export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, 
     }
 
     return finalFileBuffer;
+}
+
+export async function updateMP3Metadata(file: HiMDFile, titleInfo: TrackMetadata) {
+    // Check if this is a valid file.
+    await file.seek(0);
+    const initialBuffer = await file.read(10);
+    const { size: ea3Size } = readInitialID3Header(initialBuffer);
+    // The new buffer has to fit within the space reserved by the old one.
+    // We cannot shift the audio data around.
+    const newEA3 = serialize({
+        version: { major: 3, minor: 0 },
+        flags: 0,
+        tags: [
+            ...createCommonID3Tags(titleInfo),
+            { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_FPRCA1", " ")},
+            { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_FCRCA1", " ")},
+            { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_TRLDA", "1982/01/01 00:00:00")},
+        ],
+    }, ea3Size);
+    await file.seek(0);
+    await file.write(newEA3);
 }

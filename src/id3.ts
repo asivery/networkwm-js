@@ -34,7 +34,26 @@ export function readSynchsafeInt32(data: DataView, offset: number): [number, num
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
-export function parse(buffer: Uint8Array): ID3Tags{
+export function readInitialID3Header(buffer: Uint8Array): { major: number, minor: number, flags: number, size: number }{
+    const data = new DataView(buffer.buffer);
+    let offset = 0;
+
+    // Read header
+    let bytes;
+    [bytes, offset] = readBytes(data, offset, 3);
+    if (String.fromCharCode(...bytes) !== 'ea3') {
+        throw new Error("Not an ID3v2 tag");
+    }
+
+    let major, minor, flags, size;
+    [major, offset] = readUint8(data, offset);
+    [minor, offset] = readUint8(data, offset);
+    [flags, offset] = readUint8(data, offset);
+    [size, offset] = readSynchsafeInt32(data, offset);
+    return { major, minor, size, flags };
+}
+
+export function parse(buffer: Uint8Array): ID3Tags & { size: number } {
     const data = new DataView(buffer.buffer);
     let offset = 0;
 
@@ -54,7 +73,7 @@ export function parse(buffer: Uint8Array): ID3Tags{
     const tags: ID3Tag[] = [];
 
     // Parse frames
-    while ((offset + 10) < size + 10) {
+    while (offset < size) {
         let frameId, frameSize, frameFlags, frameContents;
         [frameId, offset] = readBytes(data, offset, 4);
         [frameSize, offset] = readUint32(data, offset);
@@ -80,6 +99,7 @@ export function parse(buffer: Uint8Array): ID3Tags{
         },
         tags,
         flags,
+        size,
     };
 };
 
@@ -92,7 +112,7 @@ function writeSynchsafeInt32(value: number): Uint8Array{
     return array;
 };
 
-export function serialize(tags: ID3Tags): Uint8Array{
+export function serialize(tags: ID3Tags, constSize?: number): Uint8Array{
     const header = new Uint8Array(10);
     header.set(textEncoder.encode('ea3'));
     header.set(writeUint8(tags.version.major), 3);
@@ -112,6 +132,13 @@ export function serialize(tags: ID3Tags): Uint8Array{
 
         frames.push(frame);
         size += frame.length;
+    }
+
+    if(constSize !== undefined) {
+        if(size > constSize) {
+            throw new Error("Too much data to encode!");
+        }
+        size = constSize;
     }
 
     if((size + 10) % 16 !== 0) {

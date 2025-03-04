@@ -6,7 +6,7 @@ import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA, updateMetadata } from "./tagged-oma";
 import { resolvePathFromGlobalIndex } from "./helpers";
 import { DeviceDefinition } from "./devices";
-import { createMP3OMAFile, generateMP3CodecField } from "./mp3";
+import { createMP3OMAFile, generateMP3CodecField, updateMP3Metadata } from "./mp3";
 import { NWCodecInfo, getCodecName, getKBPS } from "./codecs";
 import { getUint32, writeUint16 } from "./bytemanip";
 
@@ -27,7 +27,7 @@ export class DatabaseAbstraction {
     private lastTotalDuration: number = 0;
     private allTracks: AbstractedTrack[] = [];
     private deletedTracks: number[] = [];
-    private mp3DeviceKey?: number;
+    public mp3DeviceKey?: number;
     public database: DatabaseManager;
     private constructor(private filesystem: HiMDFilesystem, public deviceInfo: DeviceDefinition) {
         this.database = new DatabaseManager(filesystem, deviceInfo.databaseParameters);
@@ -337,15 +337,23 @@ export class DatabaseAbstraction {
     }
 
     async renameTrack(systemIndex: number, metadata: TrackMetadata) {
-        this.allTracks[systemIndex - 1].album = metadata.album;
-        this.allTracks[systemIndex - 1].artist = metadata.artist;
-        this.allTracks[systemIndex - 1].title = metadata.title;
-        this.allTracks[systemIndex - 1].trackNumber = metadata.trackNumber;
-        // TODO: Is this necessary??
         // Update the metadata within the OMA file
         const handle = await this.database.filesystem.open(resolvePathFromGlobalIndex(systemIndex), 'rw');
         if(handle) {
-            await updateMetadata(handle, metadata);
+            try {
+                if(this.allTracks[systemIndex - 1].codecName === "MP3") {
+                    await updateMP3Metadata(handle, metadata);
+                } else {
+                    await updateMetadata(handle, metadata);
+                }
+                // Only do this if we managed to update the track metadata in the underlying file:
+                this.allTracks[systemIndex - 1].album = metadata.album;
+                this.allTracks[systemIndex - 1].artist = metadata.artist;
+                this.allTracks[systemIndex - 1].title = metadata.title;
+                this.allTracks[systemIndex - 1].trackNumber = metadata.trackNumber;
+            } finally {
+                await handle.close();
+            }
         }
     }
 }

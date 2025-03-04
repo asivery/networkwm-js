@@ -37,11 +37,11 @@
   "dependencies": {
     "@originjs/crypto-js-wasm": "github:asivery/crypto-js-wasm",
     "async-mutex": "^0.4.0",
-    "himd-js": "^0.2.0",
+    "himd-js": "^0.2.1",
     "mp3-parser": "^0.3.0",
     "node-id3": "^0.2.5",
     "node-mass-storage": "^0.2.2",
-    "nufatfs": "^0.1.8",
+    "nufatfs": "^0.1.9",
     "usb": "^2.4.1"
   }
 }
