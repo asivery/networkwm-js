@@ -79,6 +79,14 @@ export const DeviceIds: DeviceDefinition[] = [
             initLayers: [ 'stick_gtrlst' ],
         }
     },
+    {
+        vendorId: 0x054c,
+        productId: 0x02E3,
+        name: 'Sony NW-S703F',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
 ];
 
 export function findDevice(vid: number, pid: number): DeviceDefinition | null {
