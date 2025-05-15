@@ -1,6 +1,6 @@
 {
   "name": "networkwm-js",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.2",
   "description": "A library which lets you manage tracks and metadata on Sony Network Walkmen.",
   "main": "dist/index.js",
   "scripts": {
