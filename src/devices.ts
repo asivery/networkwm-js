@@ -17,6 +17,14 @@ export const DeviceIds: DeviceDefinition[] = [
     { vendorId: 0x054c, productId: 0x0233, name: 'Sony NW-HD5' },
     {
         vendorId: 0x054c,
+        productId: 0x026a,
+        name: 'Sony NW-A1000',
+        databaseParameters: {
+            initLayers: [ 'needs_cid' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
         productId: 0x0269,
         name: 'Sony NW-A3000',
         databaseParameters: {
@@ -87,6 +95,22 @@ export const DeviceIds: DeviceDefinition[] = [
             initLayers: [ 'stick_gtrlst' ],
         }
     },
+    {
+        vendorId: 0x054c,
+        productId: 0x02ED,
+        name: 'Sony NW-A808',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [ 'stick_gtrlst' ],
+        }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x00E8,
+        name: 'Sony NW-MS70D',
+        databaseParameters: { // Assumed - device untested!!
+            initLayers: [],
+        }
+    }
 ];
 
 export function findDevice(vid: number, pid: number): DeviceDefinition | null {
