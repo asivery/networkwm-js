@@ -2,6 +2,7 @@
 import { main as tableMain } from './cli/table-file-info';
 import { main as omaMain } from './cli/tagged-oma-info';
 import { main as omaDecryptMain } from './cli/decrypt-oma';
+import { main as omaEncryptMain } from './cli/encrypt-oma';
 import { mainDeriveKey as mp3DeriveKeyMain } from './cli/decrypt-mp3';
 import { main as mp3DecryptMain } from './cli/decrypt-mp3';
 import { main as signDeviceMain } from './cli/sign-device';
@@ -25,6 +26,10 @@ const commands: CliCommand[] = [
     {
         name: 'decrypt-oma',
         root: omaDecryptMain,
+    },
+    {
+        name: 'encrypt-oma',
+        root: omaEncryptMain,
     },
     {
         name: 'derive-mp3-key',

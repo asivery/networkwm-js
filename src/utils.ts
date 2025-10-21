@@ -108,3 +108,21 @@ export class Logger {
         console.log(this.preffix + data.join(' '));
     }
 }
+
+export function getAudioDataFromWave(waveFile: Uint8Array) {
+    const dv = new DataView(waveFile.buffer);
+    const magic = textDecoder.decode(waveFile.slice(0, 4));
+    if(magic != 'RIFF') throw new Error("Not a valid RIFF wave file!");
+    let cursor = 0x0c;
+    while(cursor < waveFile.length) {
+        let name = textDecoder.decode(waveFile.slice(cursor, cursor + 4));
+        cursor += 4;
+        let size = dv.getUint32(cursor, true);
+        cursor += 4;
+        if(name != 'data') cursor += size;
+        else {
+            return waveFile.slice(cursor, cursor + size);
+        }
+    }
+    return null;
+}
