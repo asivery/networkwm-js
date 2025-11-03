@@ -9,6 +9,8 @@ export interface DeviceDefinition{
     productId: number;
     name: string;
     databaseParameters?: DatabaseParameters;
+    disableDRM?: boolean;
+    unparitioned?: boolean;
 }
 
 export const DeviceIds: DeviceDefinition[] = [
@@ -102,6 +104,16 @@ export const DeviceIds: DeviceDefinition[] = [
         databaseParameters: { // Assumed - device untested!!
             initLayers: [ 'stick_gtrlst' ],
         }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x04c8,
+        name: 'Sony NW-S754',
+        databaseParameters: {
+            initLayers: [ 'stick_gtrlst' ],
+        },
+        disableDRM: true,
+        unparitioned: true,
     },
     {
         vendorId: 0x054c,

@@ -40,7 +40,7 @@
     "himd-js": "^0.2.7",
     "mp3-parser": "^0.3.0",
     "node-id3": "^0.2.5",
-    "node-mass-storage": "^0.2.2",
+    "node-mass-storage": "^0.2.4",
     "nufatfs": "^0.1.10",
     "usb": "^2.4.1"
   }

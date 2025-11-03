@@ -111,7 +111,7 @@ export function generateMP3CodecField(mp3Data: Uint8Array): { codec: NWCodecInfo
 
 const METADATA_BLOCK_SIZE = 0x1000;
 
-export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, rawFile: Uint8Array, deviceKey: number, codec: NWCodecInfo): Uint8Array {
+export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, rawFile: Uint8Array, deviceKey: number | null, codec: NWCodecInfo): Uint8Array {
     // Strip all ID3 tags from the source MP3 file
     let cursor = 0;
     const rawDataView = new DataView(rawFile.buffer);
@@ -134,17 +134,21 @@ export function createMP3OMAFile(index: number, metadata: InboundTrackMetadata, 
             { id: 'TXXX', flags: 0, contents: encodeSonyWeirdString("OMG_TRLDA", "1982/01/01 00:00:00")},
         ],
     }, METADATA_BLOCK_SIZE);
-    const formatHeader = createEA3Header(codec, 0xFFFE, 2);
+    const formatHeader = createEA3Header(codec, deviceKey === null ? 0xFFFF : 0xFFFE, 2);
 
     const finalFileBuffer = new Uint8Array(rootID3.length + formatHeader.length + rawFile.length - cursor);
     finalFileBuffer.set(rootID3, 0);
     finalFileBuffer.set(formatHeader, rootID3.length);
-    const finalDataView = new DataView(finalFileBuffer.buffer);
-    const key = getMP3EncryptionKey(deviceKey, index);
-    let finalBufferCursor = rootID3.length + formatHeader.length;
-    for(; cursor < rawFile.length - 7; cursor += 8, finalBufferCursor += 8) {
-        finalDataView.setUint32(finalBufferCursor, rawDataView.getUint32(cursor) ^ key);
-        finalDataView.setUint32(finalBufferCursor + 4, rawDataView.getUint32(cursor + 4) ^ key);
+    if(deviceKey != null) {
+        const finalDataView = new DataView(finalFileBuffer.buffer);
+        const key = getMP3EncryptionKey(deviceKey, index);
+        let finalBufferCursor = rootID3.length + formatHeader.length;
+        for(; cursor < rawFile.length - 7; cursor += 8, finalBufferCursor += 8) {
+            finalDataView.setUint32(finalBufferCursor, rawDataView.getUint32(cursor) ^ key);
+            finalDataView.setUint32(finalBufferCursor + 4, rawDataView.getUint32(cursor + 4) ^ key);
+        }
+    } else {
+        finalFileBuffer.set(rawFile.subarray(cursor), rootID3.length + formatHeader.length);
     }
 
     return finalFileBuffer;

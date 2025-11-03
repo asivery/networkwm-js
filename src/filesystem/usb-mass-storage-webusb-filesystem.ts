@@ -211,7 +211,7 @@ export class UMSCNWJSSession {
 
 export class UMSCNWJSFilesystem extends UMSCHiMDFilesystem {
     driver: SonyVendorNWJSUSMCDriver;
-    constructor(webUSB: WebUSBDevice){
+    constructor(webUSB: WebUSBDevice, private partition: number | null = 0){
         super(webUSB);
         this.driver = new SonyVendorNWJSUSMCDriver(webUSB);
     }
@@ -222,7 +222,7 @@ export class UMSCNWJSFilesystem extends UMSCHiMDFilesystem {
         const partInfo = await this.driver.getCapacity();
         console.log(partInfo);
 
-        const baseDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(0, true);
+        const baseDriver = await this.driver.createNUFatFSVolumeDriverFromMBRPart(this.partition, true);
         this.fsUncachedDriver = this.fsDriver = createChunkingDriver(baseDriver, 240, partInfo.blockSize);
 
         this.fatfs = await FatFilesystem.create(this.fsDriver, bypassCoherencyChecks);

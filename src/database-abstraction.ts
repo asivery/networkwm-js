@@ -39,23 +39,25 @@ export class DatabaseAbstraction {
         db._create();
         // Get the MP3 device key (device ID)
         let deviceId = null;
-        if(filesystem instanceof UMSCNWJSFilesystem) {
-            deviceId = await filesystem.driver.getDiscID();
-            // Cache, if this file doesn't exist already
-            if((await filesystem.getSize(DEVICE_ID_CACHE_FILE)) === null) {
-                // Not cached. Create it.
-                const handle = await filesystem.open(DEVICE_ID_CACHE_FILE, 'rw');
-                await handle.write(deviceId);
-                await handle.close();
-            }
-        } else {
-            // Cannot retrieve directly.
-            // Check if there is a cache file.
-            const rawDeviceIDFile = await filesystem.open(DEVICE_ID_CACHE_FILE, 'ro');
-            if(rawDeviceIDFile) {
-                // Yes, it's been cached.
-                deviceId = await rawDeviceIDFile.read();
-                await rawDeviceIDFile.close();
+        if(!deviceInfo.disableDRM) {
+            if(filesystem instanceof UMSCNWJSFilesystem) {
+                deviceId = await filesystem.driver.getDiscID();
+                // Cache, if this file doesn't exist already
+                if((await filesystem.getSize(DEVICE_ID_CACHE_FILE)) === null) {
+                    // Not cached. Create it.
+                    const handle = await filesystem.open(DEVICE_ID_CACHE_FILE, 'rw');
+                    await handle.write(deviceId);
+                    await handle.close();
+                }
+            } else {
+                // Cannot retrieve directly.
+                // Check if there is a cache file.
+                const rawDeviceIDFile = await filesystem.open(DEVICE_ID_CACHE_FILE, 'ro');
+                if(rawDeviceIDFile) {
+                    // Yes, it's been cached.
+                    deviceId = await rawDeviceIDFile.read();
+                    await rawDeviceIDFile.close();
+                }
             }
         }
         if(deviceId) {
@@ -161,7 +163,7 @@ export class DatabaseAbstraction {
         rawData: Uint8Array,
         callback?: (done: number, outOf: number) => void
     ) {
-        if(this.mp3DeviceKey === undefined) throw new Error("Please load the device key first!");
+        if(this.mp3DeviceKey === undefined && !this.deviceInfo.disableDRM) throw new Error("Please load the device key first!");
         const { codec, duration } = generateMP3CodecField(rawData)
 
         const trackNumber = trackInfo.trackNumber = this.reassignTrackNumber(trackInfo);
@@ -169,8 +171,8 @@ export class DatabaseAbstraction {
             ...trackInfo,
             trackDuration: duration,
             trackNumber,
-        }, codec, 0xFFFE);
-        const mp3Data = createMP3OMAFile(globalTrackIndex, trackInfo, rawData, this.mp3DeviceKey, codec);
+        }, codec, this.deviceInfo.disableDRM ? 0xFFFF : 0xFFFE);
+        const mp3Data = createMP3OMAFile(globalTrackIndex, trackInfo, rawData, this.deviceInfo.disableDRM ? null : this.mp3DeviceKey!, codec);
         await this.copyToFilesystem(mp3Data, globalTrackIndex, callback);
     }
 

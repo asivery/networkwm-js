@@ -10,7 +10,7 @@ export function resolvePathFromGlobalIndex(globalTrackIndex: number){
 
 export async function createNWJSFS(device: { dev: WebUSBDevice, definition: DeviceDefinition }){
     // Connect into the HiMD codebase
-    const fs = new UMSCNWJSFilesystem(device.dev);
+    const fs = new UMSCNWJSFilesystem(device.dev, device.definition.unparitioned ? null : 0);
 
     await fs.init();
     await initializeIfNeeded(fs, device.definition.databaseParameters?.initLayers ?? []);
