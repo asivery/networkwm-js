@@ -67,7 +67,7 @@ export async function main(invocation: string, args: string[]){
 
     let rawAudioStream = getAudioDataFromWave(new Uint8Array(fs.readFileSync(source)))!;
     let encrypted = createTaggedEncryptedOMA(rawAudioStream, metadata, codecInfo);
-    console.log("MACList value for the encrypted file is: ", Array.from(encrypted.maclistValue).map(e => e.toString(16).padStart(2, '0')).join(''));
+    console.log("MACList value for the encrypted file is: ", Array.from(encrypted.maclistValue!).map(e => e.toString(16).padStart(2, '0')).join(''));
     console.log("Duration is: ", encrypted.duration, " seconds");
     fs.writeFileSync(dest, encrypted.data);
 }

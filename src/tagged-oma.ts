@@ -39,6 +39,19 @@ function createSonyGEOB(geobName: string, header: Uint8Array, kvmap: { name: str
     return concatUint8Arrays(dataSlices);
 }
 
+function createPrimaryHeader(titleInfo: InboundTrackMetadata, milliseconds: number) {
+    const id3Info: ID3Tags = {
+        flags: 0,
+        version: {major: 3, minor: 0},
+        tags: [
+            ...createCommonID3Tags(titleInfo),
+            {id: "TLEN", contents: encodeUTF16BEStringEA3(milliseconds.toString()), flags: 0},
+        ]
+    };
+
+    return serialize(id3Info);
+}
+
 function createEncryptionHeader(titleInfo: InboundTrackMetadata, milliseconds: number) {
     const verificationKey = createRandomBytes(8);
     const actualTrackKey = createRandomBytes(8);
@@ -105,7 +118,13 @@ function createEncryptionHeader(titleInfo: InboundTrackMetadata, milliseconds: n
     return { contents: serialize(id3Info), trackEncryptionKey: actualTrackKey, maclistValue };
 }
 
-export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}){
+export interface OmaFile {
+    data: Uint8Array,
+    duration: number,
+    maclistValue?: Uint8Array,
+}
+
+export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
     const formatHeader = createEA3Header(codec, 0x0001);
     const milliseconds = Math.floor(1000 * getSeconds(codec, Math.ceil(rawData.length / getBytesPerFrame(codec))));
     const { contents: encHeader, trackEncryptionKey, maclistValue } = createEncryptionHeader(titleInfo, milliseconds);
@@ -119,6 +138,13 @@ export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: Inbound
     rawData = wordArrayToByteArray(allData.ciphertext, rawData.length);
 
     return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, duration: milliseconds };
+}
+
+export function createTaggedOMA(rawData: Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
+    const milliseconds = Math.floor(1000 * getSeconds(codec, Math.ceil(rawData.length / getBytesPerFrame(codec))));
+    const primaryHeader = createPrimaryHeader(titleInfo, milliseconds);
+    const formatHeader = createEA3Header(codec, 0xFFFF);
+    return { data: concatUint8Arrays([primaryHeader, formatHeader, rawData]), duration: milliseconds };
 }
 
 function findInMetadata(metadata: ID3Tags, id: string, asGeob: boolean) {

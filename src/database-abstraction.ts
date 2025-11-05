@@ -3,7 +3,7 @@ import { DatabaseManager, GroupEntry, InboundTrackMetadata, TrackMetadata, TreeF
 import { complexSort, ComplexSortFormatPart, flatten } from "./sort";
 import { initializeNW } from "./initialization";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
-import { createTaggedEncryptedOMA, updateMetadata } from "./tagged-oma";
+import { createTaggedEncryptedOMA, createTaggedOMA, updateMetadata } from "./tagged-oma";
 import { resolvePathFromGlobalIndex } from "./helpers";
 import { DeviceDefinition } from "./devices";
 import { createMP3OMAFile, generateMP3CodecField, updateMP3Metadata } from "./mp3";
@@ -185,19 +185,19 @@ export class DatabaseAbstraction {
     ) {
         const trackNumber = this.reassignTrackNumber(trackInfo);
         // Step 1 - Create the encrypted OMA which will later be written to the device's storage
-        const encryptedOMA = createTaggedEncryptedOMA(rawData, trackInfo, codec);
+        const omaFile = (this.deviceInfo.disableDRM ? createTaggedOMA : createTaggedEncryptedOMA)(rawData, trackInfo, codec);
         // Step 2 - write track to the database
         const globalTrackIndex = this.addNewTrack({
             ...trackInfo,
-            trackDuration: encryptedOMA.duration,
+            trackDuration: omaFile.duration,
             trackNumber,
-        }, codec, 0x0001);
+        }, codec, this.deviceInfo.disableDRM ? 0xFFFF : 0x0001);
     
         // Step 3 - write track to the filesystem
-        await this.copyToFilesystem(encryptedOMA.data, globalTrackIndex, callback);
+        await this.copyToFilesystem(omaFile.data, globalTrackIndex, callback);
 
         // Step 4 - write MAC
-        session?.writeTrackMac(globalTrackIndex - 1, encryptedOMA.maclistValue);
+        if(!this.deviceInfo.disableDRM) session?.writeTrackMac(globalTrackIndex - 1, omaFile.maclistValue!);
     }
 
     async flushUpdates() {
