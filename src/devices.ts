@@ -70,7 +70,7 @@ export const DeviceIds: DeviceDefinition[] = [
         productId: 0x027c,
         name: 'Sony NW-A608 / NW-E505',
         disableDRM: true,
-        databaseParameters: { // Assumed - device untested!!
+        databaseParameters: {
             initLayers: [ 'stick_gtrlst' ],
         }
     },
