@@ -60,7 +60,8 @@ export const DeviceIds: DeviceDefinition[] = [
     {
         vendorId: 0x054c,
         productId: 0x01FB,
-        name: 'Sony NW-E305',
+        name: 'Sony NW-E305 / NW-E507',
+        disableDRM: true,
         databaseParameters: { // Assumed - device untested!!
             initLayers: [ 'stick_gtrlst' ],
         }
