@@ -1,10 +1,10 @@
 import { CodecInfo, HiMDCodecName, HiMDFilesystem } from "himd-js";
 import { DatabaseManager, GroupEntry, InboundTrackMetadata, TrackMetadata, TreeFile } from "./databases";
-import { complexSort, ComplexSortFormatPart, flatten } from "./sort";
+import { complexSort, ComplexSortFormatPart } from "./sort";
 import { initializeNW } from "./initialization";
 import { UMSCNWJSFilesystem, UMSCNWJSSession } from "./filesystem";
 import { createTaggedEncryptedOMA, createTaggedOMA, updateMetadata } from "./tagged-oma";
-import { resolvePathFromGlobalIndex } from "./helpers";
+import { resolvePathFromGlobalIndex } from "./utils";
 import { DeviceDefinition } from "./devices";
 import { createMP3OMAFile, generateMP3CodecField, updateMP3Metadata } from "./mp3";
 import { NWCodecInfo, getCodecName, getKBPS } from "./codecs";

@@ -1,7 +1,7 @@
 import { DatabaseAbstraction } from "../database-abstraction";
 import { importKeys, initCrypto } from "../encryption";
 import { UMSCNWJSSession } from "../filesystem";
-import { createNWJSFS, openNewDeviceNode } from "../helpers";
+import { createNWJSFS, openNewDeviceNode } from "../node-helpers";
 import { join } from 'path';
 import nfs from 'fs';
 

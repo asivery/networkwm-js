@@ -1,7 +1,3 @@
-import { CodecInfo } from 'himd-js';
-import { TrackMetadata } from './databases';
-import { encodeSonyWeirdString, encodeUTF16BEStringEA3 } from './id3';
-
 export function assert(condition: boolean, message?: string) {
     if (condition) {
         return;
@@ -125,4 +121,8 @@ export function getAudioDataFromWave(waveFile: Uint8Array) {
         }
     }
     return null;
+}
+
+export function resolvePathFromGlobalIndex(globalTrackIndex: number){
+    return join('OMGAUDIO', `10F${(globalTrackIndex >> 8).toString(16).padStart(2, '0')}`, '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
 }
