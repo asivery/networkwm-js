@@ -136,7 +136,7 @@ export class DatabaseAbstraction {
         return trackNumber;
     }
 
-    private async copyToFilesystem(data: Uint8Array, globalTrackIndex: number, callback?: (done: number, outOf: number) => void) {
+    private async copyToFilesystem(data: Uint8Array, globalTrackIndex: number, callback?: (done: number, outOf: number) => void, chunkSize = 2048) {
         // Make sure the audio store directory appropriate for this file exists
         const audioStore = `/OMGAUDIO/10F${(globalTrackIndex >> 8).toString(16).padStart(2, '0')}`;
         if(!(await this.filesystem.list("/OMGAUDIO")).some(e => e.name === audioStore)) {
@@ -149,7 +149,7 @@ export class DatabaseAbstraction {
         let i = 0;
         callback?.(i, data.length);
         while(remaining) {
-            const toWrite = Math.min(2048, remaining);
+            const toWrite = Math.min(chunkSize, remaining);
             await fh.write(data.slice(i, i + toWrite));
             i += toWrite;
             remaining -= toWrite;
@@ -161,7 +161,8 @@ export class DatabaseAbstraction {
     async uploadMP3Track(
         trackInfo: InboundTrackMetadata,
         rawData: Uint8Array,
-        callback?: (done: number, outOf: number) => void
+        callback?: (done: number, outOf: number) => void,
+        chunkSize?: number,
     ) {
         if(this.mp3DeviceKey === undefined && !this.deviceInfo.disableDRM) throw new Error("Please load the device key first!");
         const { codec, duration } = generateMP3CodecField(rawData)
@@ -173,7 +174,7 @@ export class DatabaseAbstraction {
             trackNumber,
         }, codec, this.deviceInfo.disableDRM ? 0xFFFF : 0xFFFE);
         const mp3Data = createMP3OMAFile(globalTrackIndex, trackInfo, rawData, this.deviceInfo.disableDRM ? null : this.mp3DeviceKey!, codec);
-        await this.copyToFilesystem(mp3Data, globalTrackIndex, callback);
+        await this.copyToFilesystem(mp3Data, globalTrackIndex, callback, chunkSize);
     }
 
     async uploadTrack(
@@ -181,7 +182,8 @@ export class DatabaseAbstraction {
         codec: CodecInfo,
         rawData: Uint8Array<ArrayBuffer>,
         session?: UMSCNWJSSession,
-        callback?: (done: number, outOf: number) => void
+        callback?: (done: number, outOf: number) => void,
+        chunkSize?: number,
     ) {
         const trackNumber = this.reassignTrackNumber(trackInfo);
         // Step 1 - Create the encrypted OMA which will later be written to the device's storage
@@ -194,7 +196,7 @@ export class DatabaseAbstraction {
         }, codec, this.deviceInfo.disableDRM ? 0xFFFF : 0x0001);
     
         // Step 3 - write track to the filesystem
-        await this.copyToFilesystem(omaFile.data, globalTrackIndex, callback);
+        await this.copyToFilesystem(omaFile.data, globalTrackIndex, callback, chunkSize);
 
         // Step 4 - write MAC
         if(!this.deviceInfo.disableDRM) session?.writeTrackMac(globalTrackIndex - 1, omaFile.maclistValue!);
