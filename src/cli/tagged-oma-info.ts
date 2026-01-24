@@ -14,7 +14,7 @@ const hexDump = _hexDump.bind(null, log);
 const textDecoder = new TextDecoder();
 
 const utf16Decoder = new TextDecoder("UTF-16BE");
-function parseEncryptionHeader(contents: Uint8Array, offset: number) {
+function parseEncryptionHeader(contents: Uint8Array<ArrayBuffer>, offset: number) {
     log("Encryption header (main ID3 header):");
     bumpIndent(1);
     const ea3Header = contents.subarray(offset, offset + 10);

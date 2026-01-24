@@ -7,7 +7,7 @@ import { createTrackKeyForKeyring, createTrackKeyFromKeyring, createTrackMac2, E
 import { InboundTrackMetadata, TrackMetadata } from './databases';
 import { createEA3Header } from './codecs';
 const textEncoder = new TextEncoder();
-
+type _Uint8Array = Uint8Array<ArrayBuffer>;
 const PHONY_CID = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x01, 0x0F, 0x50, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xA9, 0xC1, 0x6A, 0x81, 0x6A, 0x87, 0xDA, 0xAD, 0x4B, 0xA2, 0xC5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 const EKB1001D_CONTENTS = new Uint8Array([0x45, 0x4B, 0x42, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x00, 0x39, 0x47, 0xF4, 0x0A, 0x33, 0x65, 0x2F, 0x98, 0x71, 0x73, 0xC3, 0x98, 0x68, 0xC5, 0x23, 0x5B, 0x84, 0x20, 0xC8, 0xCF, 0xFB, 0x0E, 0x7F, 0x4E, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x34, 0x85, 0x14, 0x51, 0x45, 0x04, 0x02, 0xFF, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x36, 0xD2, 0x00, 0x38, 0x74, 0x91, 0x51, 0x9D, 0xA7, 0x75, 0x94, 0x70, 0xA0, 0x17, 0x69, 0xDA, 0x69, 0x55, 0xAE, 0xA6, 0x9F, 0x6A, 0x3E, 0x69, 0x18, 0xC7, 0xC6, 0xBB, 0xD7, 0xCC, 0xFB, 0x1B, 0x81, 0x8D, 0xA9, 0x97, 0x90, 0x67, 0x29, 0x5C, 0xB7, 0x55, 0x5A, 0xEC, 0x21, 0x1B, 0x9E, 0xBD, 0xD4, 0x7E, 0xD9, 0x09, 0x79, 0xE0, 0x39, 0xA1, 0xE0, 0x76, 0x68, 0x0D, 0xB8, 0xBF, 0xED, 0xB0, 0xD3, 0x24, 0x26, 0xB8, 0xF7, 0x79, 0x22, 0xBD, 0x46, 0xC9, 0x44, 0x9F, 0xDF, 0x01, 0x74, 0xC0, 0x00, 0x00, 0x00, 0x08, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x28, 0xDB, 0x54, 0x6A, 0xC5, 0xE0, 0x4D, 0x4F, 0xCB, 0xF2, 0x46, 0x3B, 0x01, 0xDE, 0x2C, 0xD0, 0xFB, 0xAF, 0x7A, 0xA7, 0x1E, 0xEF, 0x44, 0x29, 0x05, 0x97, 0x9D, 0xBE, 0xE7, 0x28, 0x4E, 0xA4, 0x53, 0x3A, 0x2F, 0x71, 0xC7, 0xCB, 0x86, 0x58, 0x39]);
 const ULINF_KEYRING_HEADER = new Uint8Array([
@@ -17,9 +17,9 @@ const ULINF_KEYRING_HEADER = new Uint8Array([
     0x00, 0x01, 0x00, 0x21,
 ]);
 
-function createSonyGEOB(geobName: string, header: Uint8Array, kvmap: { name: string, contents: Uint8Array, chunkLen: number, chunks: number }[]){
+function createSonyGEOB(geobName: string, header: _Uint8Array, kvmap: { name: string, contents: _Uint8Array, chunkLen: number, chunks: number }[]){
     // Header:
-    const dataSlices: Uint8Array[] = [
+    const dataSlices: _Uint8Array[] = [
         new Uint8Array([0x02]),
         textEncoder.encode("binary"),
         new Uint8Array([0, 0, 0]),
@@ -52,7 +52,9 @@ function createPrimaryHeader(titleInfo: InboundTrackMetadata, milliseconds: numb
     return serialize(id3Info);
 }
 
-function createEncryptionHeader(titleInfo: InboundTrackMetadata, milliseconds: number) {
+function createEncryptionHeader(titleInfo: InboundTrackMetadata, milliseconds: number): {
+    contents: _Uint8Array, trackEncryptionKey: _Uint8Array, maclistValue: _Uint8Array
+} {
     const verificationKey = createRandomBytes(8);
     const actualTrackKey = createRandomBytes(8);
     // In every KEYRING section, the track key is stored as decrypted by the verification key decrypted by the ekbroot
@@ -124,7 +126,7 @@ export interface OmaFile {
     maclistValue?: Uint8Array,
 }
 
-export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
+export function createTaggedEncryptedOMA(rawData: _Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
     const formatHeader = createEA3Header(codec, 0x0001);
     const milliseconds = Math.floor(1000 * getSeconds(codec, Math.ceil(rawData.length / getBytesPerFrame(codec))));
     const { contents: encHeader, trackEncryptionKey, maclistValue } = createEncryptionHeader(titleInfo, milliseconds);
@@ -140,7 +142,7 @@ export function createTaggedEncryptedOMA(rawData: Uint8Array, titleInfo: Inbound
     return { data: concatUint8Arrays([encHeader, formatHeader, rawData]), maclistValue, duration: milliseconds };
 }
 
-export function createTaggedOMA(rawData: Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
+export function createTaggedOMA(rawData: _Uint8Array, titleInfo: InboundTrackMetadata, codec: {codecId: HiMDCodec, codecInfo: Uint8Array}): OmaFile {
     const milliseconds = Math.floor(1000 * getSeconds(codec, Math.ceil(rawData.length / getBytesPerFrame(codec))));
     const primaryHeader = createPrimaryHeader(titleInfo, milliseconds);
     const formatHeader = createEA3Header(codec, 0xFFFF);
@@ -162,10 +164,10 @@ function findInMetadata(metadata: ID3Tags, id: string, asGeob: boolean) {
 
 export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
     // Read the first 10 bytes to get the encryption header's size.
-    const ea3Header = await file.read(10);
+    const ea3Header = await file.read(10) as _Uint8Array;
     if(ea3Header.length !== 10) throw new Error("Invalid header");
     const headerSizeRemaining = readSynchsafeInt32(new DataView(ea3Header.buffer), 6)[0];
-    const fullEncryptionHeader = concatUint8Arrays([ea3Header, await file.read(headerSizeRemaining)]);
+    const fullEncryptionHeader = concatUint8Arrays([ea3Header, await file.read(headerSizeRemaining) as _Uint8Array]);
     const subsequentData = await file.read();
     const metadata = parse(fullEncryptionHeader);
     const tlen = findInMetadata(metadata, "TLEN", false);

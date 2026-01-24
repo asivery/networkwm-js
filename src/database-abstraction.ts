@@ -179,7 +179,7 @@ export class DatabaseAbstraction {
     async uploadTrack(
         trackInfo: InboundTrackMetadata,
         codec: CodecInfo,
-        rawData: Uint8Array,
+        rawData: Uint8Array<ArrayBuffer>,
         session?: UMSCNWJSSession,
         callback?: (done: number, outOf: number) => void
     ) {

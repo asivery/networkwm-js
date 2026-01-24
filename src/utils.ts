@@ -10,7 +10,7 @@ export function join(...paths: string[]){
     return paths.join("/").replace(/\/*/, '/');
 }
 
-export function concatUint8Arrays(args: Uint8Array[]) {
+export function concatUint8Arrays(args: Uint8Array<ArrayBuffer>[]) {
     let totalLength = 0;
     for (let a of args) {
         totalLength += a.length;

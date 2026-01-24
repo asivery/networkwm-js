@@ -4,10 +4,6 @@ import { join } from "./utils";
 import { DeviceDefinition, DeviceIds } from "./devices";
 import { initializeIfNeeded } from "./initialization";
 
-export function resolvePathFromGlobalIndex(globalTrackIndex: number){
-    return join('OMGAUDIO', `10F${(globalTrackIndex >> 8).toString(16).padStart(2, '0')}`, '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
-}
-
 export async function createNWJSFS(device: { dev: WebUSBDevice, definition: DeviceDefinition }){
     // Connect into the HiMD codebase
     const fs = new UMSCNWJSFilesystem(device.dev, device.definition.unparitioned ? null : 0);

@@ -12,7 +12,7 @@ export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
         super(webUSB, webUSB.configuration!.interfaces.find(e => e.alternate.interfaceClass === USB_MASS_STORAGE_CLASS)!.alternate.interfaceSubclass);
     }
 
-    protected async drmRead(param: number, length: number) {
+    protected async drmRead(param: number, length: number): Promise<Uint8Array<ArrayBuffer>> {
         const command = new Uint8Array([
             0xa4,
             0x00,
@@ -32,7 +32,7 @@ export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
             0x00,
         ]);
         const result = await this.sendCommandInGetResult(command, length, false, command.length);
-        return result.result.subarray(2);
+        return result.result.subarray(2) as Uint8Array<ArrayBuffer>;
     }
 
     protected async drmWrite(param: number, data: Uint8Array) {
@@ -155,22 +155,23 @@ export class SonyVendorNWJSUSMCDriver extends SonyVendorUSMCDriver {
         await this.drmWrite(0x34, finalBuffer);
     }
 }
+type _Uint8Array = Uint8Array<ArrayBuffer>;
 
 export class UMSCNWJSSession {
     hostNonce = createRandomBytes();
     hostLeafId = new Uint8Array([0x03, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-    deviceNonce?: Uint8Array;
-    discId?: Uint8Array;
-    deviceLeafId?: Uint8Array;
-    currentIcv?: Uint8Array;
-    currentIcvHeader?: Uint8Array;
-    sessionKey?: Uint8Array;
+    deviceNonce?: _Uint8Array;
+    discId?: _Uint8Array;
+    deviceLeafId?: _Uint8Array;
+    currentIcv?: _Uint8Array;
+    currentIcvHeader?: _Uint8Array;
+    sessionKey?: _Uint8Array;
 
     mclistHandle?: HiMDFile;
     currentGeneration?: number;
 
-    allMacs?: Uint8Array;
+    allMacs?: _Uint8Array;
 
     constructor(protected driver: SonyVendorNWJSUSMCDriver, protected fs: HiMDFilesystem) {}
 
@@ -189,7 +190,7 @@ export class UMSCNWJSSession {
         this.currentGeneration = getUint32(header, 4);
 
         this.mclistHandle = await this.fs.open("/OMGAUDIO/MACLIST0.DAT", "rw");
-        this.allMacs = await this.mclistHandle.read();
+        this.allMacs = await this.mclistHandle.read() as Uint8Array<ArrayBuffer>;
     }
 
     public async finalizeSession() {

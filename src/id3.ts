@@ -112,7 +112,7 @@ function writeSynchsafeInt32(value: number): Uint8Array{
     return array;
 };
 
-export function serialize(tags: ID3Tags, constSize?: number): Uint8Array{
+export function serialize(tags: ID3Tags, constSize?: number): Uint8Array<ArrayBuffer>{
     const header = new Uint8Array(10);
     header.set(textEncoder.encode('ea3'));
     header.set(writeUint8(tags.version.major), 3);

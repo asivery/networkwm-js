@@ -87,7 +87,7 @@ export function deriveMP3TrackKey(rawFile: Uint8Array, callback?: (state: 'genFr
     return matchedKey;
 }
 
-export function decryptMP3(fullFile: Uint8Array, fileId: number, deviceKey?: number, callback?: (state: 'genFrames' | 'genKeys' | 'commonness' | 'decrypt', progress: number, of: number) => void){
+export function decryptMP3(fullFile: Uint8Array<ArrayBuffer>, fileId: number, deviceKey?: number, callback?: (state: 'genFrames' | 'genKeys' | 'commonness' | 'decrypt', progress: number, of: number) => void): Uint8Array<ArrayBuffer>{
     const trackKey = (deviceKey ? getMP3EncryptionKey(deviceKey, fileId) : deriveMP3TrackKey(fullFile, callback ? (s, p) => callback(s, p, 127) : undefined)) >>> 0;
 
     // Make sure we're dealing with an MP3 OMA file
