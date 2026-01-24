@@ -217,7 +217,9 @@ export class DatabaseAbstraction {
         // Sort
         this.deletedTracks.sort((a, b) => a - b);
         // Delete the file.
-        await this.filesystem.delete(resolvePathFromGlobalIndex(systemIndex));
+        try {
+            await this.filesystem.delete(resolvePathFromGlobalIndex(systemIndex));
+        }catch(ex){} // Might fail.
     }
 
     reserializeDatabase() {
