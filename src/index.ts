@@ -6,5 +6,6 @@ export * from './sort';
 export * from './tagged-oma';
 export * from './devices';
 export * from './derive-mp3-key';
+export * from './initialization';
 export { resolvePathFromGlobalIndex } from './utils';
 export { importKeys, initCrypto } from './encryption';
