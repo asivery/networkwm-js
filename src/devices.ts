@@ -109,6 +109,15 @@ export const DeviceIds: DeviceDefinition[] = [
     },
     {
         vendorId: 0x054c,
+        productId: 0x02c4,
+        name: 'Sony NW-E002',
+        databaseParameters: {
+            initLayers: [ 'stick_gtrlst', 'needs_cid' ]
+        },
+        disableDRM: true,
+    },
+    {
+        vendorId: 0x054c,
         productId: 0x04c8,
         name: 'Sony NW-S754',
         databaseParameters: {
