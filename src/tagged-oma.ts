@@ -174,8 +174,6 @@ export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
     const ulinf = findInMetadata(metadata, "OMG_ULINF", true);
     const bklsi = findInMetadata(metadata, "OMG_BKLSI", true);
 
-    if(!ulinf || !bklsi || !tlen) throw new Error("Not a valid encrypted OMA");
-
     const newMetadataBlock: ID3Tags = {
         flags: metadata.flags,
         version: metadata.version,
@@ -184,7 +182,7 @@ export async function updateMetadata(file: HiMDFile, titleInfo: TrackMetadata) {
             ...createCommonID3Tags(titleInfo),
             tlen,
             bklsi,
-        ]
+        ].filter(e => e) as ID3Tags['tags']
     };
     const serialized = serialize(newMetadataBlock);
     // Rewrite the file
