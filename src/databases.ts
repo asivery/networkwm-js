@@ -57,7 +57,7 @@ function writePackedTags(tags: {[key: string]: string}, elementLength: number){
         if(k.startsWith("_")) continue;
         content.set(textEncoder.encode(k), offset);
         offset += 4;
-        content.set(encodeUTF16BEStringEA3(v, true), offset + 1);
+        content.set(encodeUTF16BEStringEA3(v, true).subarray(0, elementLength - 1 - 4), offset + 1);
         offset += elementLength - 4;
     }
 
