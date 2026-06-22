@@ -133,7 +133,16 @@ export const DeviceIds: DeviceDefinition[] = [
         databaseParameters: { // Assumed - device untested!!
             initLayers: [],
         }
-    }
+    },
+    {
+        vendorId: 0x054c,
+        productId: 0x032a,
+        name: 'Sony NW-A919',
+        databaseParameters: {
+            initLayers: [ 'needs_cid' ],
+        },
+        disableDRM: true,
+    },
 ];
 
 export function findDevice(vid: number, pid: number): DeviceDefinition | null {
