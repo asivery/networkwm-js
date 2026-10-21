@@ -11,7 +11,12 @@ export interface DeviceDefinition{
     databaseParameters?: DatabaseParameters;
     disableDRM?: boolean;
     unparitioned?: boolean;
+    knownSizes?: number[],
 }
+
+const SIZE_512M = 524288000;
+const SIZE_1G = 1048576000;
+const SIZE_2G = 2097152000;
 
 export const DeviceIds: DeviceDefinition[] = [
     { vendorId: 0x054c, productId: 0x01ad, name: 'Sony NW-HD1 / NW-HD2' },
@@ -52,19 +57,21 @@ export const DeviceIds: DeviceDefinition[] = [
     {
         vendorId: 0x054c,
         productId: 0x02E4,
-        name: 'Sony NW-S203F',
+        name: 'Sony NW-S20xF',
         databaseParameters: { // Assumed - device untested!!
             initLayers: [ 'stick_gtrlst' ],
-        }
+        },
+        knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G]
     },
     {
         vendorId: 0x054c,
         productId: 0x01FB,
-        name: 'Sony NW-E305 / NW-E507',
+        name: 'Sony E20x / E30x',
         disableDRM: true,
         databaseParameters: { // Assumed - device untested!!
             initLayers: [ 'stick_gtrlst' ],
-        }
+        },
+        knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G]
     },
     {
         vendorId: 0x054c,
@@ -110,11 +117,12 @@ export const DeviceIds: DeviceDefinition[] = [
     {
         vendorId: 0x054c,
         productId: 0x02c4,
-        name: 'Sony NW-E002',
+        name: 'Sony NW-E00x',
         databaseParameters: {
             initLayers: [ 'stick_gtrlst', 'needs_cid' ]
         },
         disableDRM: true,
+        knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G]
     },
     {
         vendorId: 0x054c,
