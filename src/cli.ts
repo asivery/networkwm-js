@@ -6,6 +6,7 @@ import { main as omaEncryptMain } from './cli/encrypt-oma';
 import { mainDeriveKey as mp3DeriveKeyMain } from './cli/decrypt-mp3';
 import { main as mp3DecryptMain } from './cli/decrypt-mp3';
 import { main as signDeviceMain } from './cli/sign-device';
+import { main as initFolderMain } from './cli/init-folder-as-wm';
 
 import { basename } from 'path';
 
@@ -42,6 +43,10 @@ const commands: CliCommand[] = [
     {
         name: 'sign-device',
         root: signDeviceMain,
+    },
+    {
+        name: 'init-folder',
+        root: initFolderMain,
     }
 ];
 
