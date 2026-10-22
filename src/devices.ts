@@ -11,7 +11,8 @@ export interface DeviceDefinition{
     databaseParameters?: DatabaseParameters;
     disableDRM?: boolean;
     unparitioned?: boolean;
-    knownSizes?: number[],
+    knownSizes?: number[];
+    series?: string;
 }
 
 const SIZE_512M = 524288000;
@@ -28,7 +29,9 @@ export const DeviceIds: DeviceDefinition[] = [
         name: 'Sony NW-A1000',
         databaseParameters: {
             initLayers: [ 'needs_cid' ],
-        }
+        },
+        knownSizes: [6 * SIZE_1G, 8 * SIZE_1G],
+        series: 'Sony NW-A1000 series',
     },
     {
         vendorId: 0x054c,
@@ -36,7 +39,9 @@ export const DeviceIds: DeviceDefinition[] = [
         name: 'Sony NW-A3000',
         databaseParameters: {
             initLayers: [ 'needs_cid' ],
-        }
+        },
+        series: 'Sony NW-A1000 series',
+        knownSizes: [20 * SIZE_1G],
     },
     {
         vendorId: 0x054c,
@@ -58,7 +63,7 @@ export const DeviceIds: DeviceDefinition[] = [
         vendorId: 0x054c,
         productId: 0x02E4,
         name: 'Sony NW-S20xF',
-        databaseParameters: { // Assumed - device untested!!
+        databaseParameters: {
             initLayers: [ 'stick_gtrlst' ],
         },
         knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G]
