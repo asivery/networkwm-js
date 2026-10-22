@@ -66,7 +66,8 @@ export const DeviceIds: DeviceDefinition[] = [
         databaseParameters: {
             initLayers: [ 'stick_gtrlst' ],
         },
-        knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G]
+        knownSizes: [SIZE_512M, SIZE_1G, SIZE_2G],
+        disableDRM: true,
     },
     {
         vendorId: 0x054c,
