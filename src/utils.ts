@@ -1,3 +1,8 @@
+import { FSAHiMDFilesystem } from "himd-js";
+import { DeviceDefinition } from "./devices";
+import { initializeIfNeeded } from "./initialization";
+import { DatabaseAbstraction } from "./database-abstraction";
+
 export function assert(condition: boolean, message?: string) {
     if (condition) {
         return;
@@ -125,4 +130,16 @@ export function getAudioDataFromWave(waveFile: Uint8Array) {
 
 export function resolvePathFromGlobalIndex(globalTrackIndex: number){
     return join('OMGAUDIO', `10F${(globalTrackIndex >> 8).toString(16).padStart(2, '0')}`, '1000' + globalTrackIndex.toString(16).padStart(4, '0').toUpperCase() + '.OMA');
+}
+
+export async function openNewDeviceFSA(device: DeviceDefinition, sizeVariantIndex: number = -1) {
+    let fsSize: number | undefined;
+    if(sizeVariantIndex === -1) {
+        fsSize = undefined; // HiMD-js should default to 1GiB
+    } else {
+        fsSize = device.knownSizes?.[sizeVariantIndex];
+    }
+    const fs = await FSAHiMDFilesystem.init(false, false, fsSize);
+    await initializeIfNeeded(fs, device.databaseParameters?.initLayers ?? []);
+    return await DatabaseAbstraction.create(fs, device);
 }
